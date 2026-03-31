@@ -63,20 +63,9 @@ fun HomeScreen(
     // Placeholder — wire to real settings later
     val notificationsEnabled = true
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAddEdit,
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add event")
-            }
-        }
-    ) { innerPadding ->
+    Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         ) {
             // ── Header ──────────────────────────────────────────────────────
@@ -145,6 +134,16 @@ fun HomeScreen(
 
             // Space so FAB doesn't cover the last item
             item { Spacer(Modifier.height(72.dp)) }
+        }
+
+        FloatingActionButton(
+            onClick = onNavigateToAddEdit,
+            containerColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Add event")
         }
     }
 }
