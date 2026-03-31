@@ -22,6 +22,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.combined_schedule.ui.screens.*
 import com.example.combined_schedule.ui.theme.Combined_scheduleTheme
 
@@ -31,6 +33,9 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Bus : Screen("bus", "Bus", Icons.Default.LocationOn)
     object AddEdit : Screen("add_edit", "Add/Edit", Icons.Default.Add)
     object Notifications : Screen("notifications", "Alerts", Icons.Default.Notifications)
+    object CourseDetail : Screen("course_detail/{eventId}", "", Icons.Default.DateRange) {
+        fun routeFor(eventId: Int) = "course_detail/$eventId"
+    }
 }
 
 val bottomNavItems = listOf(
@@ -58,10 +63,11 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val isDetailScreen = currentDestination?.route?.startsWith("course_detail") == true
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            if (!isDetailScreen) NavigationBar {
                 bottomNavItems.forEach { screen ->
                     NavigationBarItem(
                         icon = { Icon(screen.icon, contentDescription = screen.label) },
@@ -97,13 +103,26 @@ fun AppNavigation() {
                         navController.navigate(Screen.Notifications.route) {
                             launchSingleTop = true
                         }
+                    },
+                    onCourseClick = { event ->
+                        navController.navigate(Screen.CourseDetail.routeFor(event.id))
                     }
                 )
             }
             composable(Screen.Classes.route) { ClassScheduleScreen() }
             composable(Screen.Bus.route) { BusScheduleScreen() }
-            composable(Screen.AddEdit.route) { AddEditEntryScreen() }
+            composable(Screen.AddEdit.route) { AddEditEntryScreen(onBack = { navController.popBackStack() }) }
             composable(Screen.Notifications.route) { NotificationSettingsScreen() }
+            composable(
+                route = Screen.CourseDetail.route,
+                arguments = listOf(navArgument("eventId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val eventId = backStackEntry.arguments?.getInt("eventId") ?: return@composable
+                CourseDetailScreen(
+                    eventId = eventId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
