@@ -1,5 +1,6 @@
 package com.example.combined_schedule.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.combined_schedule.data.SampleEventRepository
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalDate
@@ -31,7 +33,8 @@ data class ScheduleEvent(
 @Composable
 fun HomeScreen(
     onNavigateToAddEdit: () -> Unit = {},
-    onNavigateToNotifications: () -> Unit = {}
+    onNavigateToNotifications: () -> Unit = {},
+    onCourseClick: (ScheduleEvent) -> Unit = {}
 ) {
     val today = LocalDate.now()
     val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d")
@@ -46,15 +49,7 @@ fun HomeScreen(
         }
     }
 
-    // Placeholder events — replace with real data layer later
-    val allEvents = remember {
-        listOf(
-            ScheduleEvent(1, "MATH 241 Lecture",      LocalTime.of(9, 0),  "Altgeld Hall 141",      isBus = false, reminderEnabled = true),
-            ScheduleEvent(2, "22 Illini Bus",          LocalTime.of(10, 30),"Green & Wright Stop",   isBus = true,  reminderEnabled = false),
-            ScheduleEvent(3, "CS 124 Lab",             LocalTime.of(13, 0), "Siebel Center 0216",    isBus = false, reminderEnabled = true),
-            ScheduleEvent(4, "PHYS 212 Discussion",    LocalTime.of(15, 0), "Loomis Lab 141",        isBus = false, reminderEnabled = false),
-        )
-    }
+    val allEvents = SampleEventRepository.events
 
     val pastEvents     = allEvents.filter { it.time.isBefore(currentTime) }
     val upcomingEvents = allEvents.filter { !it.time.isBefore(currentTime) }
@@ -110,7 +105,7 @@ fun HomeScreen(
                 }
             } else {
                 items(upcomingEvents, key = { it.id }) { event ->
-                    EventListItem(event = event, isPast = false)
+                    EventListItem(event = event, isPast = false, onClick = { if (!event.isBus) onCourseClick(event) })
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -127,7 +122,7 @@ fun HomeScreen(
                     Spacer(Modifier.height(8.dp))
                 }
                 items(pastEvents, key = { "past_${it.id}" }) { event ->
-                    EventListItem(event = event, isPast = true)
+                    EventListItem(event = event, isPast = true, onClick = { if (!event.isBus) onCourseClick(event) })
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -342,13 +337,14 @@ private fun NoMoreEventsCard() {
 // ─── Event List Item ─────────────────────────────────────────────────────────
 
 @Composable
-private fun EventListItem(event: ScheduleEvent, isPast: Boolean) {
+private fun EventListItem(event: ScheduleEvent, isPast: Boolean, onClick: () -> Unit = {}) {
     val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (isPast) 0.45f else 1f),
+            .alpha(if (isPast) 0.45f else 1f)
+            .then(if (!event.isBus) Modifier.clickable(onClick = onClick) else Modifier),
         shape     = RoundedCornerShape(12.dp),
         colors    = CardDefaults.cardColors(
             containerColor = if (isPast)
