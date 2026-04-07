@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -31,6 +32,13 @@ import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+data class PlaceResult(
+    val name: String,
+    val displayName: String,
+    val lat: Double,
+    val lng: Double
+)
 
 class BusScheduleViewModel(
     private val repo: BusRepository,
@@ -44,6 +52,71 @@ class BusScheduleViewModel(
 
     var isLoadingLive by mutableStateOf(false)
         private set
+
+    // ── Place search ─────────────────────────────────────────────────────────
+    private val _searchResults = MutableStateFlow<List<PlaceResult>>(emptyList())
+    val searchResults: StateFlow<List<PlaceResult>> = _searchResults.asStateFlow()
+
+    var isSearching by mutableStateOf(false)
+        private set
+
+    var selectedPlace by mutableStateOf<PlaceResult?>(null)
+        private set
+
+    fun searchPlaces(query: String) {
+        if (query.isBlank()) { _searchResults.value = emptyList(); return }
+        viewModelScope.launch {
+            isSearching = true
+            val results = withContext(Dispatchers.IO) {
+                try {
+                    val encoded = URLEncoder.encode(query, "UTF-8")
+                    val url = URL(
+                        "https://nominatim.openstreetmap.org/search" +
+                        "?q=$encoded&format=json&limit=5" +
+                        "&viewbox=-88.35,40.15,-88.10,40.05&bounded=0"
+                    )
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.setRequestProperty("User-Agent", "CombinedScheduleApp/1.0 (Android)")
+                    conn.connectTimeout = 5_000
+                    conn.readTimeout = 5_000
+                    val json = conn.inputStream.bufferedReader().readText()
+                    parseNominatimResults(json)
+                } catch (_: Exception) { emptyList() }
+            }
+            _searchResults.value = results
+            isSearching = false
+        }
+    }
+
+    fun selectPlace(place: PlaceResult) {
+        selectedPlace = place
+        _searchResults.value = emptyList()
+    }
+
+    fun clearSearch() {
+        selectedPlace = null
+        _searchResults.value = emptyList()
+    }
+
+    private fun parseNominatimResults(json: String): List<PlaceResult> {
+        val results = mutableListOf<PlaceResult>()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length().coerceAtMost(5)) {
+                val obj = arr.getJSONObject(i)
+                val name = obj.optString("name").ifBlank {
+                    obj.optString("display_name").substringBefore(",").trim()
+                }
+                val displayName = obj.optString("display_name")
+                val lat = obj.optDouble("lat", 0.0)
+                val lng = obj.optDouble("lon", 0.0)
+                if (lat != 0.0 && lng != 0.0) {
+                    results.add(PlaceResult(name, displayName, lat, lng))
+                }
+            }
+        } catch (_: Exception) { /* graceful fallback */ }
+        return results
+    }
 
     fun fetchLiveArrivals(routeName: String) {
         viewModelScope.launch {

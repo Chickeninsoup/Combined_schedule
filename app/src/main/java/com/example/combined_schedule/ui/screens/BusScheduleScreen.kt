@@ -44,13 +44,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -80,6 +85,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.combined_schedule.data.SavedBusTrip
 import com.example.combined_schedule.ui.viewmodel.BusScheduleViewModel
+import com.example.combined_schedule.ui.viewmodel.PlaceResult
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalDate
@@ -95,6 +101,8 @@ private val favoriteColor = Color(0xFFFFB300)
 private val liveColor = Color(0xFF00897B)
 private val placeAccent = Color(0xFF2E7D32)
 private val placeContainer = Color(0xFFE8F5E9)
+private val searchAccent = Color(0xFF7B1FA2)
+private val searchContainer = Color(0xFFF3E5F5)
 
 // ── Known UIUC bus stop coordinates (lat, lng) ────────────────────────────────
 private val uiucCampusCenter = 40.1020 to -88.2272
@@ -213,8 +221,14 @@ fun BusScheduleScreen() {
                     trips = filteredTrips,
                     savedPlaces = savedPlaces,
                     hasLocationPermission = hasLocationPermission,
+                    selectedPlace = vm.selectedPlace,
                     onMapTap = { lat, lng -> pendingTapLocation = lat to lng }
                 )
+            }
+
+            item {
+                PlaceSearchBar(vm = vm)
+                Spacer(Modifier.height(8.dp))
             }
 
             item {
@@ -697,6 +711,7 @@ private fun BusMapCard(
     trips: List<SavedBusTrip>,
     savedPlaces: List<SavedLocation>,
     hasLocationPermission: Boolean,
+    selectedPlace: PlaceResult?,
     onMapTap: (Double, Double) -> Unit
 ) {
     val context = LocalContext.current
@@ -741,6 +756,20 @@ private fun BusMapCard(
                 "setConfig($configJson)",
                 null
             )
+        }
+    }
+
+    // Animate the map to the searched place and show a purple marker (or clear it).
+    LaunchedEffect(selectedPlace, pageReady) {
+        if (!pageReady) return@LaunchedEffect
+        if (selectedPlace != null) {
+            val safeName = selectedPlace.name.replace("\\", "\\\\").replace("\"", "\\\"")
+            webViewRef.value?.evaluateJavascript(
+                "setSearchMarker(${selectedPlace.lat}, ${selectedPlace.lng}, \"$safeName\")",
+                null
+            )
+        } else {
+            webViewRef.value?.evaluateJavascript("clearSearchMarker()", null)
         }
     }
 
@@ -789,6 +818,181 @@ private fun BusMapCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
+            }
+        }
+    }
+}
+
+// ── Place search bar ──────────────────────────────────────────────────────────
+@Composable
+private fun PlaceSearchBar(vm: BusScheduleViewModel) {
+    val context = LocalContext.current
+    val searchResults by vm.searchResults.collectAsState()
+    val selectedPlace = vm.selectedPlace
+
+    var query by remember { mutableStateOf("") }
+
+    // Debounce: wait 400ms after the user stops typing before searching.
+    // Don't clear selectedPlace when query is blanked programmatically by a selection.
+    LaunchedEffect(query) {
+        if (query.length >= 2) {
+            delay(400)
+            vm.searchPlaces(query)
+        } else if (vm.selectedPlace == null) {
+            vm.clearSearch()
+        }
+    }
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it; if (it.isNotEmpty()) vm.clearSearch() },
+            placeholder = { Text("Search for a place near UIUC…") },
+            leadingIcon = {
+                if (vm.isSearching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = searchAccent
+                    )
+                } else {
+                    Icon(Icons.Default.Search, null, tint = searchAccent)
+                }
+            },
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(onClick = { query = ""; vm.clearSearch() }) {
+                        Icon(Icons.Default.Clear, "Clear search")
+                    }
+                }
+            } else null,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true
+        )
+
+        // Dropdown results list
+        if (searchResults.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp),
+                elevation = CardDefaults.cardElevation(8.dp)
+            ) {
+                searchResults.forEachIndexed { index, place ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                query = ""
+                                vm.selectPlace(place)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn, null,
+                            tint = searchAccent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                place.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                place.displayName
+                                    .split(",").take(3).joinToString(",").trim(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    if (index < searchResults.lastIndex) HorizontalDivider()
+                }
+            }
+        }
+
+        // Selected place card with "Get Directions" button
+        if (selectedPlace != null && searchResults.isEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = searchContainer),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(shape = RoundedCornerShape(6.dp), color = searchAccent) {
+                        Text(
+                            "PLACE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            selectedPlace.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = searchAccent
+                        )
+                        Text(
+                            "%.5f, %.5f".format(selectedPlace.lat, selectedPlace.lng),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // Get Directions button
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = searchAccent,
+                        modifier = Modifier.clickable {
+                            val navUri = Uri.parse(
+                                "google.navigation:q=${selectedPlace.lat},${selectedPlace.lng}"
+                            )
+                            val navIntent = Intent(Intent.ACTION_VIEW, navUri)
+                                .setPackage("com.google.android.apps.maps")
+                            val fallbackUri = Uri.parse(
+                                "geo:${selectedPlace.lat},${selectedPlace.lng}" +
+                                "?q=${Uri.encode(selectedPlace.name)}"
+                            )
+                            try {
+                                context.startActivity(navIntent)
+                            } catch (_: Exception) {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, fallbackUri))
+                            }
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Directions, null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                "Directions",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
             }
         }
     }

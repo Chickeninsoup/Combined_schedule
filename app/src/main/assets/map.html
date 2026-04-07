@@ -28,6 +28,7 @@
   }).addTo(map);
 
   var layers = [];
+  var searchMarker = null;
 
   function clearMarkers() {
     layers.forEach(function(l) { map.removeLayer(l); });
@@ -60,6 +61,19 @@
       }).bindPopup('<b>' + p.name + '</b><br><small>Saved place</small>');
       m.addTo(map); layers.push(m);
     });
+  }
+
+  function setSearchMarker(lat, lng, name) {
+    if (searchMarker) { map.removeLayer(searchMarker); }
+    searchMarker = L.circleMarker([lat, lng], {
+      radius: 12, fillColor: '#7B1FA2', color: '#fff', weight: 2.5, fillOpacity: 0.95
+    }).bindPopup('<b>' + name + '</b><br><small>Search result</small>').addTo(map);
+    searchMarker.openPopup();
+    map.flyTo([lat, lng], 16, { animate: true, duration: 1.0 });
+  }
+
+  function clearSearchMarker() {
+    if (searchMarker) { map.removeLayer(searchMarker); searchMarker = null; }
   }
 
   map.on('click', function(e) {
