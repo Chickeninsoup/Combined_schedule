@@ -6,7 +6,8 @@
 # 2. A git pre-commit hook (copies transcripts into .claude-sessions/ and stages them)
 #
 # Claude stores transcripts at ~/.claude/projects/<encoded-path>/*.jsonl
-# where <encoded-path> replaces / with - in the project directory path.
+# where <encoded-path> replaces all non-alphanumeric characters with -.
+# For paths longer than 200 chars (encoded), Claude truncates and appends a hash suffix.
 
 project_dir="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
 if [ -z "$project_dir" ]; then
@@ -16,19 +17,23 @@ fi
 session_dir="$project_dir/.claude-sessions"
 
 copy_transcripts() {
-  # Try multiple path encodings to handle Mac, Linux, and Windows (MSYS2/Git Bash)
-  for encoded_path in \
-    "$(echo "$project_dir" | sed 's|/|-|g')" \
-    "$(cygpath -w "$project_dir" 2>/dev/null | sed 's|[:/\\]|-|g')" \
-  ; do
-    [ -z "$encoded_path" ] && continue
+  local encoded_path claude_dir
+  encoded_path="$(echo "$project_dir" | sed 's|[^a-zA-Z0-9]|-|g')"
+
+  if [ "${#encoded_path}" -le 200 ]; then
+    # Short path: exact match
     claude_dir="$HOME/.claude/projects/$encoded_path"
-    if [ -d "$claude_dir" ]; then
-      mkdir -p "$session_dir"
-      cp "$claude_dir"/*.jsonl "$session_dir/" 2>/dev/null
-      break
-    fi
-  done
+  else
+    # Long path (>200 chars): Claude truncates to 200 chars and appends a hash.
+    # Use the prefix to find the matching directory.
+    local prefix="${encoded_path:0:200}"
+    claude_dir="$(find "$HOME/.claude/projects" -maxdepth 1 -type d -name "${prefix}*" | head -1)"
+  fi
+
+  if [ -n "$claude_dir" ] && [ -d "$claude_dir" ]; then
+    mkdir -p "$session_dir"
+    cp "$claude_dir"/*.jsonl "$session_dir/" 2>/dev/null
+  fi
 }
 
 if [ -n "$CLAUDE_SESSION_ID" ]; then
