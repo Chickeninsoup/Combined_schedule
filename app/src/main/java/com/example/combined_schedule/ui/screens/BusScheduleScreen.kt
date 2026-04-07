@@ -120,12 +120,14 @@ private val knownStopCoordinates = mapOf(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-private fun parseTime(s: String): LocalTime? = try {
-    LocalTime.parse(
-        s.trim().uppercase(Locale.ENGLISH),
-        DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
-    )
-} catch (_: Exception) { null }
+private fun parseTime(s: String): LocalTime? {
+    val normalized = s.trim().uppercase(Locale.ENGLISH)
+        // Insert a space before AM/PM if missing (e.g. "8:30AM" → "8:30 AM")
+        .replace(Regex("(\\d)(AM|PM)$"), "$1 $2")
+    return try {
+        LocalTime.parse(normalized, DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+    } catch (_: Exception) { null }
+}
 
 private fun todayShortDay(): String =
     LocalDate.now().dayOfWeek
@@ -139,6 +141,7 @@ fun BusScheduleScreen() {
     val vm: BusScheduleViewModel = viewModel(factory = BusScheduleViewModel.Factory(context))
     val allTrips by vm.trips.collectAsState()
     val liveArrivals by vm.liveArrivals.collectAsState()
+    val loadingRoutes by vm.loadingRoutes.collectAsState()
 
     val locationRepo = remember { LocationRepository.getInstance(context) }
     val savedPlaces by locationRepo.getAll().collectAsState()
@@ -181,6 +184,21 @@ fun BusScheduleScreen() {
     }
 
     var selectedDay by remember { mutableStateOf(todayShortDay()) }
+
+    // Auto-advance to today at midnight: track the calendar date so we only reset the
+    // day filter once per real day change, not every time the user picks a different day.
+    var lastKnownDate by remember { mutableStateOf(LocalDate.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L) // check every minute
+            val today = LocalDate.now()
+            if (today != lastKnownDate) {
+                lastKnownDate = today
+                selectedDay = todayShortDay()
+            }
+        }
+    }
+
     var showDialog by remember { mutableStateOf(false) }
     var editingTrip by remember { mutableStateOf<SavedBusTrip?>(null) }
 
@@ -263,7 +281,7 @@ fun BusScheduleScreen() {
                             trip = trip,
                             currentTime = currentTime,
                             liveArrivals = liveArrivals[trip.routeName] ?: emptyList(),
-                            isLoadingLive = vm.isLoadingLive,
+                            isLoadingLive = trip.routeName in loadingRoutes,
                             onEdit = { editingTrip = trip; showDialog = true },
                             onDelete = { vm.delete(trip) },
                             onFavoriteToggle = {
@@ -660,7 +678,11 @@ private fun BusTripCard(
                 // Map deep-link
                 IconButton(onClick = {
                     val uri = Uri.parse("geo:0,0?q=${Uri.encode(trip.stopName)}")
-                    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    } catch (_: Exception) {
+                        // No maps app available — silently ignore
+                    }
                 }) {
                     Icon(
                         Icons.Default.LocationOn, "Open in Maps",
@@ -763,7 +785,7 @@ private fun BusMapCard(
     LaunchedEffect(selectedPlace, pageReady) {
         if (!pageReady) return@LaunchedEffect
         if (selectedPlace != null) {
-            val safeName = selectedPlace.name.replace("\\", "\\\\").replace("\"", "\\\"")
+            val safeName = jsonEscape(selectedPlace.name)
             webViewRef.value?.evaluateJavascript(
                 "setSearchMarker(${selectedPlace.lat}, ${selectedPlace.lng}, \"$safeName\")",
                 null
@@ -998,6 +1020,9 @@ private fun PlaceSearchBar(vm: BusScheduleViewModel) {
     }
 }
 
+private fun jsonEscape(s: String): String =
+    s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")
+
 private fun buildMapConfigJson(
     centerLat: Double,
     centerLng: Double,
@@ -1010,12 +1035,10 @@ private fun buildMapConfigJson(
         "\"userLat\":$userLat,\"userLng\":$userLng,"
     else ""
     val stopsJson = stops.joinToString(",") { (name, coord) ->
-        val safe = name.replace("\"", "\\\"")
-        "{\"name\":\"$safe\",\"lat\":${coord.first},\"lng\":${coord.second}}"
+        "{\"name\":\"${jsonEscape(name)}\",\"lat\":${coord.first},\"lng\":${coord.second}}"
     }
     val placesJson = savedPlaces.joinToString(",") { p ->
-        val safe = p.name.replace("\"", "\\\"")
-        "{\"name\":\"$safe\",\"lat\":${p.lat},\"lng\":${p.lng}}"
+        "{\"name\":\"${jsonEscape(p.name)}\",\"lat\":${p.lat},\"lng\":${p.lng}}"
     }
     return "{\"centerLat\":$centerLat,\"centerLng\":$centerLng,${userPart}\"stops\":[$stopsJson],\"places\":[$placesJson]}"
 }
@@ -1093,7 +1116,11 @@ private fun SavedPlaceCard(place: SavedLocation, onDelete: () -> Unit) {
             ) {
                 IconButton(onClick = {
                     val uri = Uri.parse("geo:${place.lat},${place.lng}?q=${place.lat},${place.lng}(${Uri.encode(place.name)})")
-                    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    } catch (_: Exception) {
+                        // No maps app available — silently ignore
+                    }
                 }) {
                     Icon(
                         Icons.Default.LocationOn, "Open in Maps",
@@ -1202,12 +1229,22 @@ private fun BusTripDialog(
                     label = { Text("Direction") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                val badTimes = remember(departureTimesText) {
+                    departureTimesText
+                        .split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() && parseTime(it) == null }
+                }
                 OutlinedTextField(
                     value = departureTimesText, onValueChange = { departureTimesText = it },
                     label = { Text("Departure Times") },
                     placeholder = {
                         Text("8:30 AM, 10:30 AM", style = MaterialTheme.typography.labelSmall)
                     },
+                    isError = badTimes.isNotEmpty(),
+                    supportingText = if (badTimes.isNotEmpty()) {
+                        { Text("Can't parse: ${badTimes.joinToString(", ")} — use \"h:mm AM/PM\"") }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1281,10 +1318,14 @@ private fun BusTripDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
                     val times = departureTimesText
                         .split(",")
                         .map { it.trim() }
                         .filter { it.isNotBlank() }
+                        // Normalize to canonical "h:mm AM/PM" format; skip unparseable entries
+                        .mapNotNull { raw -> parseTime(raw)?.format(timeFormatter) }
+                        .distinct()
                     onConfirm(
                         SavedBusTrip(
                             id = initial?.id ?: java.util.UUID.randomUUID().toString(),

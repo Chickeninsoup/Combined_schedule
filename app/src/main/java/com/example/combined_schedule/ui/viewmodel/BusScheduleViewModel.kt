@@ -50,8 +50,9 @@ class BusScheduleViewModel(
     private val _liveArrivals = MutableStateFlow<Map<String, List<String>>>(emptyMap())
     val liveArrivals: StateFlow<Map<String, List<String>>> = _liveArrivals.asStateFlow()
 
-    var isLoadingLive by mutableStateOf(false)
-        private set
+    // Tracks which routes are currently loading live data so each card shows its own spinner.
+    private val _loadingRoutes = MutableStateFlow<Set<String>>(emptySet())
+    val loadingRoutes: StateFlow<Set<String>> = _loadingRoutes.asStateFlow()
 
     // ── Place search ─────────────────────────────────────────────────────────
     private val _searchResults = MutableStateFlow<List<PlaceResult>>(emptyList())
@@ -120,7 +121,7 @@ class BusScheduleViewModel(
 
     fun fetchLiveArrivals(routeName: String) {
         viewModelScope.launch {
-            isLoadingLive = true
+            _loadingRoutes.value = _loadingRoutes.value + routeName
             val result = withContext(Dispatchers.IO) {
                 try {
                     val encoded = URLEncoder.encode(routeName, "UTF-8")
@@ -140,7 +141,7 @@ class BusScheduleViewModel(
             if (result != null) {
                 _liveArrivals.value = _liveArrivals.value + (routeName to result)
             }
-            isLoadingLive = false
+            _loadingRoutes.value = _loadingRoutes.value - routeName
         }
     }
 
@@ -169,8 +170,10 @@ class BusScheduleViewModel(
     fun delete(trip: SavedBusTrip) = repo.delete(trip)
 
     fun scheduleReminder(trip: SavedBusTrip, departureTime: LocalTime) {
+        // "None" reminder means the user does not want a notification for this trip.
+        if (trip.reminderMinutes <= 0) return
         val minutesUntil = Duration.between(LocalTime.now(), departureTime).toMinutes()
-        val leadMinutes = if (trip.reminderMinutes > 0) trip.reminderMinutes.toLong() else 5L
+        val leadMinutes = trip.reminderMinutes.toLong()
         if (minutesUntil <= leadMinutes) return
 
         val triggerMs = System.currentTimeMillis() + (minutesUntil - leadMinutes) * 60_000L
