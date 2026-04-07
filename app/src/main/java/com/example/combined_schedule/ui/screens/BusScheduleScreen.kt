@@ -756,11 +756,12 @@ private fun BusMapCard(
             .mapNotNull { name -> knownStopCoordinates[name]?.let { name to it } }
     }
 
-    val centerLat = userLat ?: uiucCampusCenter.first
-    val centerLng = userLng ?: uiucCampusCenter.second
+    // Always center on UIUC campus; user location is shown as a blue dot only.
+    val centerLat = uiucCampusCenter.first
+    val centerLng = uiucCampusCenter.second
 
     // JSON config injected into the map after page load
-    val configJson = remember(centerLat, centerLng, userLat, userLng, stopMarkers, savedPlaces) {
+    val configJson = remember(userLat, userLng, stopMarkers, savedPlaces) {
         buildMapConfigJson(centerLat, centerLng, userLat, userLng, stopMarkers, savedPlaces)
     }
 
