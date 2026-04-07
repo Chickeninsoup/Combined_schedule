@@ -820,6 +820,19 @@ private fun BusMapCard(
                             },
                             "Android"
                         )
+                        // Prevent the parent LazyColumn from stealing touch events so
+                        // the user can pan and zoom the Leaflet map.
+                        setOnTouchListener { v, event ->
+                            when (event.action) {
+                                android.view.MotionEvent.ACTION_DOWN,
+                                android.view.MotionEvent.ACTION_MOVE ->
+                                    v.parent.requestDisallowInterceptTouchEvent(true)
+                                android.view.MotionEvent.ACTION_UP,
+                                android.view.MotionEvent.ACTION_CANCEL ->
+                                    v.parent.requestDisallowInterceptTouchEvent(false)
+                            }
+                            false // let the WebView handle the event itself
+                        }
                         webViewRef.value = this
                         loadUrl("file:///android_asset/map.html")
                     }
