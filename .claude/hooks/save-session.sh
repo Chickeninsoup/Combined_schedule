@@ -9,7 +9,11 @@
 # where <encoded-path> replaces all non-alphanumeric characters with -.
 # For paths longer than 200 chars (encoded), Claude truncates and appends a hash suffix.
 
-project_dir="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+# Always use git rev-parse for the project path, not CLAUDE_PROJECT_DIR.
+# On Windows, Claude Code POSIX-converts CLAUDE_PROJECT_DIR (C:\Users\foo -> /c/Users/foo)
+# but stores transcripts using the native path encoding. git rev-parse returns the native
+# path format on all platforms, so the encoding always matches.
+project_dir="$(git rev-parse --show-toplevel 2>/dev/null)"
 if [ -z "$project_dir" ]; then
   exit 0
 fi
