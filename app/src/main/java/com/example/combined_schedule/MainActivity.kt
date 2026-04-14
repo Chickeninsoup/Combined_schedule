@@ -47,6 +47,7 @@ val bottomNavItems = listOf(
     Screen.Home,
     Screen.Classes,
     Screen.Bus,
+    Screen.AddEdit,
     Screen.Weather,
     Screen.Notifications
 )
