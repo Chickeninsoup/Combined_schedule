@@ -83,9 +83,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.compose.runtime.produceState
 import com.example.combined_schedule.data.SavedBusTrip
 import com.example.combined_schedule.ui.viewmodel.BusScheduleViewModel
 import com.example.combined_schedule.ui.viewmodel.PlaceResult
+import com.example.combined_schedule.util.BusPredictor
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalDate
@@ -99,6 +103,7 @@ private val busAccent = Color(0xFFE65100)
 private val busContainer = Color(0xFFFFF3E0)
 private val favoriteColor = Color(0xFFFFB300)
 private val liveColor = Color(0xFF00897B)
+private val schedColor = Color(0xFFF57C00) // amber — indicates schedule-based estimate
 private val placeAccent = Color(0xFF2E7D32)
 private val placeContainer = Color(0xFFE8F5E9)
 private val searchAccent = Color(0xFF7B1FA2)
@@ -183,6 +188,13 @@ fun BusScheduleScreen() {
         }
     }
 
+    // Network state — re-checked whenever currentTime ticks (every 30 s)
+    val isOffline by produceState(initialValue = false, currentTime) {
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        value = caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     var selectedDay by remember { mutableStateOf(todayShortDay()) }
 
     // Auto-advance to today at midnight: track the calendar date so we only reset the
@@ -199,12 +211,30 @@ fun BusScheduleScreen() {
         }
     }
 
+    // On first load, if today has no trips advance to the nearest day that does.
+    var autoAdvanced by remember { mutableStateOf(false) }
+    val allDaysOrdered = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+    LaunchedEffect(allTrips) {
+        if (!autoAdvanced && allTrips.isNotEmpty()) {
+            autoAdvanced = true
+            val today = todayShortDay()
+            val hasTripsToday = allTrips.any { today in it.daysOfWeek }
+            if (!hasTripsToday) {
+                val todayIndex = allDaysOrdered.indexOf(today)
+                val nextDay = (1..7)
+                    .map { allDaysOrdered[(todayIndex + it) % 7] }
+                    .firstOrNull { day -> allTrips.any { day in it.daysOfWeek } }
+                if (nextDay != null) selectedDay = nextDay
+            }
+        }
+    }
+
     var showDialog by remember { mutableStateOf(false) }
     var editingTrip by remember { mutableStateOf<SavedBusTrip?>(null) }
 
     val filteredTrips = remember(allTrips, selectedDay) {
         allTrips
-            .filter { selectedDay in it.daysOfWeek }
+            .filter { selectedDay == "All" || selectedDay in it.daysOfWeek }
             .sortedBy { trip ->
                 trip.departureTimes.mapNotNull { parseTime(it) }.minOrNull() ?: LocalTime.MAX
             }
@@ -267,10 +297,19 @@ fun BusScheduleScreen() {
                             .padding(vertical = 40.dp),
                         contentAlignment = Alignment.Center
                     ) {
+                        val emptyMsg = when {
+                            selectedDay == "All" ->
+                                "No bus trips saved yet — tap + to add one"
+                            selectedDay in listOf("Sat", "Sun") ->
+                                "No trips on $selectedDay — most routes run Mon–Fri"
+                            else ->
+                                "No trips for $selectedDay — tap + to add one"
+                        }
                         Text(
-                            "No bus trips for $selectedDay",
+                            emptyMsg,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
                 }
@@ -282,6 +321,7 @@ fun BusScheduleScreen() {
                             currentTime = currentTime,
                             liveArrivals = liveArrivals[trip.routeName] ?: emptyList(),
                             isLoadingLive = trip.routeName in loadingRoutes,
+                            isOffline = isOffline,
                             onEdit = { editingTrip = trip; showDialog = true },
                             onDelete = { vm.delete(trip) },
                             onFavoriteToggle = {
@@ -477,7 +517,7 @@ private fun NextBusBanner(
 // ── Day filter row ────────────────────────────────────────────────────────────
 @Composable
 private fun DayFilterRow(selectedDay: String, onDaySelected: (String) -> Unit) {
-    val days = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+    val days = listOf("All", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -503,6 +543,7 @@ private fun BusTripCard(
     currentTime: LocalTime,
     liveArrivals: List<String>,
     isLoadingLive: Boolean,
+    isOffline: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onFavoriteToggle: () -> Unit,
@@ -629,7 +670,10 @@ private fun BusTripCard(
                     }
                 }
 
-                // Live arrivals
+                // Live arrivals or schedule-based prediction when offline
+                val prediction = remember(trip.departureTimes, currentTime) {
+                    BusPredictor.predict(trip.departureTimes, currentTime)
+                }
                 Spacer(Modifier.height(6.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -637,24 +681,44 @@ private fun BusTripCard(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = liveColor,
-                        modifier = Modifier.clickable(onClick = onFetchLive)
+                        color = if (isOffline) schedColor else liveColor,
+                        modifier = if (isOffline) Modifier else Modifier.clickable(onClick = onFetchLive)
                     ) {
                         Text(
-                            text = if (isLoadingLive) "..." else "LIVE",
+                            text = when {
+                                isLoadingLive -> "..."
+                                isOffline -> "SCHED"
+                                else -> "LIVE"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
-                    if (liveArrivals.isNotEmpty()) {
-                        Text(
+                    when {
+                        liveArrivals.isNotEmpty() -> Text(
                             "Next: ${liveArrivals.first()}",
                             style = MaterialTheme.typography.labelSmall,
                             color = liveColor,
                             fontWeight = FontWeight.SemiBold
                         )
+                        isOffline -> when (val p = prediction) {
+                            is BusPredictor.Prediction.Departed -> Text(
+                                "Left ~${p.minutesAgo}m ago · est. in route",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = schedColor,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            is BusPredictor.Prediction.Upcoming -> Text(
+                                "~${p.minutesUntil}m away (scheduled)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = schedColor,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            else -> {}
+                        }
+                        else -> {}
                     }
                 }
 
@@ -1054,7 +1118,8 @@ private fun buildMapConfigJson(
     val placesJson = savedPlaces.joinToString(",") { p ->
         "{\"name\":\"${jsonEscape(p.name)}\",\"lat\":${p.lat},\"lng\":${p.lng}}"
     }
-    return "{\"centerLat\":$centerLat,\"centerLng\":$centerLng,${userPart}\"stops\":[$stopsJson],\"places\":[$placesJson]}"
+    return "{\"centerLat\":$centerLat,\"centerLng\":$centerLng," +
+        "${userPart}\"stops\":[$stopsJson],\"places\":[$placesJson]}"
 }
 
 private class MapJsInterface(private val onTap: (Double, Double) -> Unit) {
@@ -1129,7 +1194,10 @@ private fun SavedPlaceCard(place: SavedLocation, onDelete: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 IconButton(onClick = {
-                    val uri = Uri.parse("geo:${place.lat},${place.lng}?q=${place.lat},${place.lng}(${Uri.encode(place.name)})")
+                    val encoded = Uri.encode(place.name)
+                    val uri = Uri.parse(
+                        "geo:${place.lat},${place.lng}?q=${place.lat},${place.lng}($encoded)"
+                    )
                     try {
                         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                     } catch (_: Exception) {

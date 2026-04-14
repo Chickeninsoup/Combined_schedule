@@ -1,38 +1,28 @@
 package com.example.combined_schedule.data
 
 import android.content.Context
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class LocationRepository(context: Context) {
 
-    private val prefs = context.getSharedPreferences("saved_locations_prefs", Context.MODE_PRIVATE)
-    private val gson = Gson()
-    private val listType = object : TypeToken<List<SavedLocation>>() {}.type
+    private val dao = AppDatabase.getInstance(context).savedLocationDao()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val _locations = MutableStateFlow<List<SavedLocation>>(loadAll())
+    private val allLocations: StateFlow<List<SavedLocation>> = dao.getAll()
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    fun getAll(): StateFlow<List<SavedLocation>> = _locations.asStateFlow()
+    fun getAll(): StateFlow<List<SavedLocation>> = allLocations
 
-    private fun loadAll(): List<SavedLocation> {
-        val json = prefs.getString(KEY, null) ?: return emptyList()
-        return gson.fromJson(json, listType) ?: emptyList()
-    }
-
-    private fun saveAll(locations: List<SavedLocation>) {
-        prefs.edit().putString(KEY, gson.toJson(locations)).apply()
-        _locations.value = locations
-    }
-
-    fun insert(location: SavedLocation) = saveAll(_locations.value + location)
-    fun delete(location: SavedLocation) = saveAll(_locations.value.filter { it.id != location.id })
+    fun insert(location: SavedLocation) { scope.launch { dao.insert(location) } }
+    fun delete(location: SavedLocation) { scope.launch { dao.delete(location) } }
 
     companion object {
-        private const val KEY = "all_saved_locations"
-
         @Volatile private var INSTANCE: LocationRepository? = null
 
         fun getInstance(context: Context): LocationRepository =

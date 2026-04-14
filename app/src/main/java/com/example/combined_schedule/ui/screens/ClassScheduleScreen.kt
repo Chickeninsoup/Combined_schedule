@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,8 +30,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.combined_schedule.data.EntryType
 import com.example.combined_schedule.data.ScheduleEntry
 import com.example.combined_schedule.ui.viewmodel.ClassScheduleViewModel
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
@@ -58,8 +62,8 @@ fun entryLabel(type: EntryType) = when (type) {
     EntryType.SPECIAL_EVENT -> "Event"
 }
 fun entryIcon(type: EntryType) = when (type) {
-    EntryType.COURSE        -> Icons.Default.MenuBook
-    EntryType.ASSIGNMENT    -> Icons.Default.Assignment
+    EntryType.COURSE        -> Icons.AutoMirrored.Filled.MenuBook
+    EntryType.ASSIGNMENT    -> Icons.AutoMirrored.Filled.Assignment
     EntryType.SPECIAL_EVENT -> Icons.Default.Celebration
 }
 
@@ -70,7 +74,7 @@ fun parseDate(s: String): LocalDate? = try {
 
 fun formatDisplay(s: String): String {
     val d = parseDate(s) ?: return s
-    return d.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+    return d.format(DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ENGLISH))
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -240,7 +244,7 @@ private fun CalendarCard(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Previous month")
                 }
                 Text(
-                    text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                    text = currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.ENGLISH)),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -464,6 +468,7 @@ private fun InfoChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text
 }
 
 // ── Add / Edit dialog ─────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EntryDialog(
     initial: ScheduleEntry?,
@@ -476,6 +481,33 @@ private fun EntryDialog(
     var date        by remember { mutableStateOf(initial?.date        ?: "") }
     var time        by remember { mutableStateOf(initial?.time        ?: "") }
     var location    by remember { mutableStateOf(initial?.location    ?: "") }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = try {
+                LocalDate.parse(date).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            } catch (_: Exception) { null }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = pickerState.selectedDateMillis
+                    if (millis != null) {
+                        date = Instant.ofEpochMilli(millis)
+                            .atOffset(ZoneOffset.UTC).toLocalDate().toString()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -504,10 +536,19 @@ private fun EntryDialog(
                     label = { Text("Description") }, maxLines = 2,
                     modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = date, onValueChange = { date = it },
-                        label = { Text("Date") },
-                        placeholder = { Text("YYYY-MM-DD", style = MaterialTheme.typography.labelSmall) },
-                        singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.DateRange, contentDescription = null,
+                            modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            if (date.isBlank()) "Date"
+                            else formatDisplay(date),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
                     OutlinedTextField(value = time, onValueChange = { time = it },
                         label = { Text("Time") },
                         placeholder = { Text("9:00 AM", style = MaterialTheme.typography.labelSmall) },

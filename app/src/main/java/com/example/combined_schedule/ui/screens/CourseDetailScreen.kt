@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,21 +16,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.combined_schedule.data.SampleEventRepository
+import com.example.combined_schedule.data.HomeEntry
+import com.example.combined_schedule.data.HomeEntryRepository
 import com.example.combined_schedule.data.Work
+
 import com.example.combined_schedule.ui.viewmodel.CourseDetailViewModel
+import com.example.combined_schedule.util.DateUtils
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CourseDetailScreen(
-    eventId: Int,
+    entryId: String,
     onBack: () -> Unit
 ) {
-    val event = SampleEventRepository.findById(eventId)
     val context = LocalContext.current
+    val entry = remember { HomeEntryRepository.getInstance(context).findById(entryId) }
     val vm: CourseDetailViewModel = viewModel(
-        factory = CourseDetailViewModel.Factory(context, event?.title ?: "")
+        factory = CourseDetailViewModel.Factory(context, entry?.title ?: "")
     )
 
     val works by vm.works.collectAsState(initial = emptyList())
@@ -38,10 +46,10 @@ fun CourseDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(event?.title ?: "Course Detail", fontWeight = FontWeight.Bold) },
+                title = { Text(entry?.title ?: "Course Detail", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -68,8 +76,8 @@ fun CourseDetailScreen(
         ) {
             // Course info card
             item {
-                if (event != null) {
-                    CourseInfoCard(event)
+                if (entry != null) {
+                    CourseInfoCard(entry)
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "Works & Assignments",
@@ -120,8 +128,13 @@ fun CourseDetailScreen(
 }
 
 @Composable
-private fun CourseInfoCard(event: ScheduleEvent) {
-    val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private fun CourseInfoCard(entry: HomeEntry) {
+    val timeFormatter = DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.ENGLISH)
+    val parts = entry.time.split(":")
+    val displayTime = runCatching {
+        LocalTime.of(parts[0].toInt(), parts[1].toInt()).format(timeFormatter)
+    }.getOrDefault(entry.time)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -130,9 +143,9 @@ private fun CourseInfoCard(event: ScheduleEvent) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(text = if (event.isBus) "🚌" else "📚", style = MaterialTheme.typography.headlineSmall)
+                Text(text = if (entry.isBus) "🚌" else "📚", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    text = event.title,
+                    text = entry.title,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -142,19 +155,21 @@ private fun CourseInfoCard(event: ScheduleEvent) {
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
                 Text(
-                    text = event.time.format(timeFormatter),
+                    text = displayTime,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
-                Text(
-                    text = event.location,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                )
+            if (entry.location.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    Text(
+                        text = entry.location,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
             }
         }
     }
@@ -199,11 +214,14 @@ private fun WorkItem(work: Work, onToggle: () -> Unit, onDelete: () -> Unit) {
                     )
                 }
                 if (work.dueDate.isNotBlank()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(12.dp),
                             tint = MaterialTheme.colorScheme.primary)
                         Text(
-                            text = "Due: ${work.dueDate}",
+                            text = "Due: ${formatWorkDate(work.dueDate)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -218,6 +236,7 @@ private fun WorkItem(work: Work, onToggle: () -> Unit, onDelete: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddWorkDialog(
     onDismiss: () -> Unit,
@@ -226,6 +245,29 @@ private fun AddWorkDialog(
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var dueDate by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = pickerState.selectedDateMillis
+                    if (millis != null) {
+                        dueDate = Instant.ofEpochMilli(millis)
+                            .atOffset(ZoneOffset.UTC).toLocalDate().toString()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -247,13 +289,18 @@ private fun AddWorkDialog(
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = dueDate,
-                    onValueChange = { dueDate = it },
-                    label = { Text("Due Date (e.g. Apr 5)") },
-                    singleLine = true,
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null,
+                        modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (dueDate.isBlank()) "Set due date (optional)"
+                        else formatWorkDate(dueDate)
+                    )
+                }
             }
         },
         confirmButton = {
@@ -266,3 +313,5 @@ private fun AddWorkDialog(
         }
     )
 }
+
+private fun formatWorkDate(isoDate: String): String = DateUtils.formatDisplayDate(isoDate)

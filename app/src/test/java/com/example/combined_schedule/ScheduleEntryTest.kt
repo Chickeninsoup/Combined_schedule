@@ -2,7 +2,10 @@ package com.example.combined_schedule
 
 import com.example.combined_schedule.data.EntryType
 import com.example.combined_schedule.data.ScheduleEntry
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScheduleEntryTest {

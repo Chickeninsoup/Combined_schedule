@@ -1,7 +1,11 @@
 package com.example.combined_schedule
 
 import com.example.combined_schedule.data.Work
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WorkTest {

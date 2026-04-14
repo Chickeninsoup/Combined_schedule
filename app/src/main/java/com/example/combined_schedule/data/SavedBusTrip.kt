@@ -1,7 +1,11 @@
 package com.example.combined_schedule.data
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "bus_trips")
 data class SavedBusTrip(
-    val id: String = java.util.UUID.randomUUID().toString(),
+    @PrimaryKey val id: String = java.util.UUID.randomUUID().toString(),
     val routeName: String,
     val stopName: String,
     val direction: String = "",

@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -40,6 +42,23 @@ android {
     }
 }
 
+detekt {
+    config.setFrom("$rootDir/detekt.yml")
+    buildUponDefaultConfig = true
+    allRules = false
+    baseline = file("$rootDir/detekt-baseline.xml")
+}
+
+ktlint {
+    version = "1.3.1"
+    android = true
+    outputToConsole = true
+    ignoreFailures = false
+    filter {
+        exclude("**/generated/**")
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -54,6 +73,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.gson)
     implementation(libs.play.services.location)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    annotationProcessor(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

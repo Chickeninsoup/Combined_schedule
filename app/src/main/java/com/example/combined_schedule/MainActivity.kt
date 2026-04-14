@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,10 +32,14 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Home : Screen("home", "Home", Icons.Default.Home)
     object Classes : Screen("classes", "Classes", Icons.Default.DateRange)
     object Bus : Screen("bus", "Bus", Icons.Default.LocationOn)
+    object Weather : Screen("weather", "Weather", Icons.Default.Cloud)
     object AddEdit : Screen("add_edit", "Add/Edit", Icons.Default.Add)
     object Notifications : Screen("notifications", "Alerts", Icons.Default.Notifications)
-    object CourseDetail : Screen("course_detail/{eventId}", "", Icons.Default.DateRange) {
-        fun routeFor(eventId: Int) = "course_detail/$eventId"
+    object CourseDetail : Screen("course_detail/{entryId}", "", Icons.Default.DateRange) {
+        fun routeFor(entryId: String) = "course_detail/$entryId"
+    }
+    object EditEntry : Screen("edit_entry/{entryId}", "", Icons.Default.Add) {
+        fun routeFor(entryId: String) = "edit_entry/$entryId"
     }
 }
 
@@ -42,7 +47,7 @@ val bottomNavItems = listOf(
     Screen.Home,
     Screen.Classes,
     Screen.Bus,
-    Screen.AddEdit,
+    Screen.Weather,
     Screen.Notifications
 )
 
@@ -64,6 +69,7 @@ fun AppNavigation() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val isDetailScreen = currentDestination?.route?.startsWith("course_detail") == true
+        || currentDestination?.route?.startsWith("edit_entry") == true
 
     Scaffold(
         bottomBar = {
@@ -104,22 +110,36 @@ fun AppNavigation() {
                             launchSingleTop = true
                         }
                     },
-                    onCourseClick = { event ->
-                        navController.navigate(Screen.CourseDetail.routeFor(event.id))
+                    onCourseClick = { entry ->
+                        navController.navigate(Screen.CourseDetail.routeFor(entry.id))
+                    },
+                    onEditEntry = { entryId ->
+                        navController.navigate(Screen.EditEntry.routeFor(entryId))
                     }
                 )
             }
             composable(Screen.Classes.route) { ClassScheduleScreen() }
             composable(Screen.Bus.route) { BusScheduleScreen() }
+            composable(Screen.Weather.route) { WeatherScreen() }
             composable(Screen.AddEdit.route) { AddEditEntryScreen(onBack = { navController.popBackStack() }) }
             composable(Screen.Notifications.route) { NotificationSettingsScreen() }
             composable(
                 route = Screen.CourseDetail.route,
-                arguments = listOf(navArgument("eventId") { type = NavType.IntType })
+                arguments = listOf(navArgument("entryId") { type = NavType.StringType })
             ) { backStackEntry ->
-                val eventId = backStackEntry.arguments?.getInt("eventId") ?: return@composable
+                val entryId = backStackEntry.arguments?.getString("entryId") ?: return@composable
                 CourseDetailScreen(
-                    eventId = eventId,
+                    entryId = entryId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = Screen.EditEntry.route,
+                arguments = listOf(navArgument("entryId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val entryId = backStackEntry.arguments?.getString("entryId") ?: return@composable
+                AddEditEntryScreen(
+                    entryId = entryId,
                     onBack = { navController.popBackStack() }
                 )
             }
