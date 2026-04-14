@@ -17,7 +17,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.combined_schedule.data.HomeEntry
-import com.example.combined_schedule.data.NotificationSettingsRepository
 import com.example.combined_schedule.data.Work
 import com.example.combined_schedule.data.WorkRepository
 import com.example.combined_schedule.ui.viewmodel.HomeEntryViewModel
@@ -40,9 +39,6 @@ fun HomeScreen(
     val context = LocalContext.current
     val vm: HomeEntryViewModel = viewModel(factory = HomeEntryViewModel.Factory(context))
     val allEntries by vm.entries.collectAsState()
-
-    val settingsRepo = remember { NotificationSettingsRepository.getInstance(context) }
-    val notificationsEnabled by settingsRepo.globalEnabled.collectAsState()
 
     val workRepo = remember { WorkRepository.getInstance(context) }
     val allWorks by workRepo.getAll().collectAsState()
@@ -86,11 +82,21 @@ fun HomeScreen(
         ) {
             // ── Header ───────────────────────────────────────────────────────
             item {
-                HeaderSection(
-                    formattedDate = formattedDate,
-                    remainingCount = upcomingEntries.size,
-                    notificationsEnabled = notificationsEnabled,
-                    onNotificationsClick = onNavigateToNotifications
+                Text(
+                    text = formattedDate,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(4.dp))
+                val statusLine = when (upcomingEntries.size) {
+                    0 -> "No more events today"
+                    1 -> "1 event remaining today"
+                    else -> "${upcomingEntries.size} events remaining today"
+                }
+                Text(
+                    text = statusLine,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(20.dp))
             }
@@ -258,68 +264,6 @@ private fun entryTime(entry: HomeEntry): LocalTime {
     val h = parts.getOrNull(0)?.toIntOrNull() ?: 0
     val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
     return LocalTime.of(h, m)
-}
-
-// ─── Header ─────────────────────────────────────────────────────────────────
-
-@Composable
-private fun HeaderSection(
-    formattedDate: String,
-    remainingCount: Int,
-    notificationsEnabled: Boolean,
-    onNotificationsClick: () -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.DateRange,
-                    contentDescription = "App logo",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "CombinedSchedule",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            IconButton(onClick = onNotificationsClick) {
-                Icon(
-                    imageVector = if (notificationsEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                    contentDescription = if (notificationsEnabled) "Notifications on" else "Notifications off",
-                    tint = if (notificationsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-
-        Text(
-            text = formattedDate,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Spacer(Modifier.height(4.dp))
-
-        val statusLine = when (remainingCount) {
-            0 -> "No more events today"
-            1 -> "You have 1 event remaining today"
-            else -> "You have $remainingCount events remaining today"
-        }
-        Text(
-            text = statusLine,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
 }
 
 // ─── Next Event Banner ───────────────────────────────────────────────────────

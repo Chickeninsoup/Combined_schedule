@@ -1,0 +1,21 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>LongParameterList:BusScheduleScreen.kt$( centerLat: Double, centerLng: Double, userLat: Double?, userLng: Double?, stops: List&lt;Pair&lt;String, Pair&lt;Double, Double&gt;&gt;&gt;, savedPlaces: List&lt;SavedLocation&gt; )</ID>
+    <ID>MatchingDeclarationName:HomeScreen.kt$ScheduleEvent</ID>
+    <ID>MaxLineLength:BusScheduleScreen.kt$return "{\"centerLat\":$centerLat,\"centerLng\":$centerLng,${userPart}\"stops\":[$stopsJson],\"places\":[$placesJson]}"</ID>
+    <ID>MaxLineLength:BusScheduleScreen.kt$val uri = Uri.parse("geo:${place.lat},${place.lng}?q=${place.lat},${place.lng}(${Uri.encode(place.name)})")</ID>
+    <ID>MaxLineLength:CourseDetailScreen.kt$Row</ID>
+    <ID>MaxLineLength:SampleEventRepository.kt$SampleEventRepository$ScheduleEvent(1, "MATH 241 Lecture", LocalTime.of(9, 0), "Altgeld Hall 141", isBus = false, reminderEnabled = true)</ID>
+    <ID>MaxLineLength:SampleEventRepository.kt$SampleEventRepository$ScheduleEvent(2, "22 Illini Bus", LocalTime.of(10, 30),"Green &amp; Wright Stop", isBus = true, reminderEnabled = false)</ID>
+    <ID>MaxLineLength:SampleEventRepository.kt$SampleEventRepository$ScheduleEvent(3, "CS 124 Lab", LocalTime.of(13, 0), "Siebel Center 0216", isBus = false, reminderEnabled = true)</ID>
+    <ID>MaxLineLength:SampleEventRepository.kt$SampleEventRepository$ScheduleEvent(4, "PHYS 212 Discussion", LocalTime.of(15, 0), "Loomis Lab 141", isBus = false, reminderEnabled = false)</ID>
+    <ID>NewLineAtEndOfFile:Color.kt$com.example.combined_schedule.ui.theme.Color.kt</ID>
+    <ID>NewLineAtEndOfFile:ExampleUnitTest.kt$com.example.combined_schedule.ExampleUnitTest.kt</ID>
+    <ID>NewLineAtEndOfFile:Theme.kt$com.example.combined_schedule.ui.theme.Theme.kt</ID>
+    <ID>NewLineAtEndOfFile:Type.kt$com.example.combined_schedule.ui.theme.Type.kt</ID>
+    <ID>UnusedParameter:WorkRepository.kt$WorkRepository$courseTitle: String</ID>
+    <ID>WildcardImport:ExampleUnitTest.kt$import org.junit.Assert.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

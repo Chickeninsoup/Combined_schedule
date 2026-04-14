@@ -15,6 +15,9 @@ interface HomeEntryDao {
     @Query("SELECT * FROM home_entries ORDER BY time ASC")
     suspend fun getAllList(): List<HomeEntry>
 
+    @Query("SELECT * FROM home_entries WHERE title LIKE '%' || :query || '%' OR location LIKE '%' || :query || '%' ORDER BY time ASC")
+    suspend fun search(query: String): List<HomeEntry>
+
     @Query("SELECT COUNT(*) FROM home_entries")
     suspend fun count(): Int
 

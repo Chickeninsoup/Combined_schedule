@@ -1,0 +1,85 @@
+CS124 App Architecture Quiz
+============================
+
+--- MULTIPLE CHOICE ---
+
+1. When a user saves a new schedule entry, how does the Home screen know to display it
+   without being manually refreshed?
+
+   A) The ViewModel calls notifyDataSetChanged() on the adapter
+   B) Room emits a new value through its Flow, which propagates up to the UI via StateFlow
+      and collectAsState()
+   C) The Add/Edit screen directly updates the Home screen's state
+   D) A broadcast is sent that the Home screen listens for
+
+   Answer: B
+
+
+2. What is the Repository layer's primary responsibility?
+
+   A) Rendering the UI and managing Compose state
+   B) Defining the database schema and SQL queries
+   C) Owning data-fetching logic, caching, and exposing StateFlow to ViewModels
+   D) Handling screen navigation and route arguments
+
+   Answer: C
+
+
+3. Why are ViewModels used instead of storing data directly in Composables?
+
+   A) Composables can't hold any state at all
+   B) ViewModels survive screen rotation; Composables are destroyed and recreated
+   C) Room can only be accessed from a ViewModel
+   D) Jetpack Compose requires ViewModels by default
+
+   Answer: B
+
+
+4. Your app uses AlarmManager for notifications rather than WorkManager. What is the main
+   practical risk of this approach?
+
+   A) AlarmManager can only schedule one alarm at a time
+   B) Alarms require an internet connection to fire
+   C) Android may delay or suppress exact alarms due to battery optimization and Doze mode
+   D) AlarmManager doesn't survive app restarts
+
+   Answer: C
+
+
+5. Weather and bus arrival data are not stored in Room. What consequence does this have
+   for users?
+
+   A) The data can never be displayed in the UI
+   B) The data is lost when the app is closed and must be fetched again each session
+   C) The data is automatically synced to the cloud instead
+   D) The data is stored in SharedPreferences as a fallback
+
+   Answer: B
+
+
+--- SHORT ANSWER ---
+
+6. Your app has a Repository layer sitting between the ViewModel and the DAO. What would
+   break or get worse if you removed it and had ViewModels talk directly to DAOs?
+
+   Answer: Multiple ViewModels that need the same data (e.g. HomeEntry on both Home and
+   Classes screens) would each duplicate the fetch/cache/coroutine logic. Changing the
+   caching strategy or data source would require updates in multiple places. Bugs would
+   diverge across screens. The Repository exists so that data logic has exactly one home.
+
+
+7. When you write a new entry to the database, you don't have to manually tell the Home
+   screen to refresh. Why not — what mechanism handles that automatically?
+
+   Answer: Room's DAO returns a Flow. Any write to the database causes Room to emit a new
+   list on that Flow. The Repository exposes this as a StateFlow, the ViewModel passes it
+   to the Composable, and collectAsState() causes the screen to recompose automatically
+   with the updated data.
+
+
+8. Your app stores all user data locally in Room rather than in a cloud database like
+   Firebase. What is the most important trade-off that decision makes?
+
+   Answer: The app works fully offline and requires no backend or authentication, but user
+   data is trapped on the device. If the user uninstalls the app or switches phones,
+   everything is lost. There is no cross-device sync.

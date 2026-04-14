@@ -9,6 +9,9 @@ interface WorkDao {
     @Query("SELECT * FROM works ORDER BY isCompleted ASC, dueDate ASC")
     fun getAll(): Flow<List<Work>>
 
+    @Query("SELECT * FROM works WHERE title LIKE '%' || :query || '%' OR courseTitle LIKE '%' || :query || '%' ORDER BY isCompleted ASC, dueDate ASC")
+    suspend fun search(query: String): List<Work>
+
     @Query("SELECT COUNT(*) FROM works")
     suspend fun count(): Int
 
