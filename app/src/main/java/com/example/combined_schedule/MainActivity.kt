@@ -311,7 +311,7 @@ private fun SearchResultsOverlay(
         } else if (results.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    "No results for "$query"",
+                    "No results for \"$query\"",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
