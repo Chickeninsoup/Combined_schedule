@@ -12,14 +12,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DateRange
@@ -27,6 +30,11 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -75,6 +83,7 @@ import com.example.combined_schedule.ui.screens.HomeScreen
 import com.example.combined_schedule.ui.screens.NotificationSettingsScreen
 import com.example.combined_schedule.ui.screens.WeatherScreen
 import com.example.combined_schedule.ui.theme.Combined_scheduleTheme
+import com.example.combined_schedule.ui.viewmodel.AgentState
 import com.example.combined_schedule.ui.viewmodel.SearchResult
 import com.example.combined_schedule.ui.viewmodel.SearchViewModel
 
@@ -130,6 +139,7 @@ fun AppNavigation() {
     val query by searchVm.query.collectAsStateWithLifecycle()
     val isSearching by searchVm.isSearching.collectAsStateWithLifecycle()
     val searchResults by searchVm.results.collectAsStateWithLifecycle()
+    val agentState by searchVm.agentState.collectAsStateWithLifecycle()
 
     BackHandler(enabled = isSearching) { searchVm.closeSearch() }
 
@@ -256,6 +266,8 @@ fun AppNavigation() {
                 SearchResultsOverlay(
                     query = query,
                     results = searchResults,
+                    agentState = agentState,
+                    onAskAgent = searchVm::askAgent,
                     onEntryClick = { entry ->
                         searchVm.closeSearch()
                         navController.navigate(Screen.CourseDetail.routeFor(entry.id))
@@ -293,6 +305,8 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
 private fun SearchResultsOverlay(
     query: String,
     results: List<SearchResult>,
+    agentState: AgentState,
+    onAskAgent: () -> Unit,
     onEntryClick: (HomeEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -308,25 +322,121 @@ private fun SearchResultsOverlay(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        } else if (results.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    "No results for \"$query\"",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         } else {
             LazyColumn {
-                items(results) { result ->
-                    when (result) {
-                        is SearchResult.EntryResult ->
-                            EntrySearchItem(result.entry, onClick = { onEntryClick(result.entry) })
-                        is SearchResult.WorkResult ->
-                            WorkSearchItem(result.work)
-                    }
+                // ── AI Agent card ─────────────────────────────────────────────
+                item {
+                    AgentCard(
+                        agentState = agentState,
+                        onAskAgent = onAskAgent,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
+
+                // ── Local results ─────────────────────────────────────────────
+                if (results.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No schedule or assignment matches for \"$query\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    items(results) { result ->
+                        when (result) {
+                            is SearchResult.EntryResult ->
+                                EntrySearchItem(result.entry, onClick = { onEntryClick(result.entry) })
+                            is SearchResult.WorkResult ->
+                                WorkSearchItem(result.work)
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentCard(
+    agentState: AgentState,
+    onAskAgent: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "AI Assistant",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+                when (agentState) {
+                    is AgentState.Idle -> {
+                        Button(
+                            onClick = onAskAgent,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Text("Ask", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    is AgentState.Loading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                    is AgentState.Answer -> {
+                        Button(
+                            onClick = onAskAgent,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Text("Ask again", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+
+            if (agentState is AgentState.Answer) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = agentState.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             }
         }
     }

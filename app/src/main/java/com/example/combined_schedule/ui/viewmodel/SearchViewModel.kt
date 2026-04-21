@@ -4,21 +4,29 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.combined_schedule.data.AgentRepository
 import com.example.combined_schedule.data.AppDatabase
 import com.example.combined_schedule.data.HomeEntry
 import com.example.combined_schedule.data.Work
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class SearchResult {
     data class EntryResult(val entry: HomeEntry) : SearchResult()
     data class WorkResult(val work: Work) : SearchResult()
+}
+
+sealed class AgentState {
+    object Idle : AgentState()
+    object Loading : AgentState()
+    data class Answer(val text: String) : AgentState()
 }
 
 @OptIn(FlowPreview::class)
@@ -35,6 +43,9 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
+    private val _agentState = MutableStateFlow<AgentState>(AgentState.Idle)
+    val agentState: StateFlow<AgentState> = _agentState.asStateFlow()
+
     init {
         viewModelScope.launch {
             _query
@@ -43,6 +54,7 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
                 .collect { q ->
                     if (q.isBlank()) {
                         _results.value = emptyList()
+                        _agentState.value = AgentState.Idle
                     } else {
                         val entries = db.homeEntryDao().search(q)
                             .map { SearchResult.EntryResult(it) }
@@ -58,6 +70,26 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
         _query.value = q
     }
 
+    /** Ask the AI agent using the current query and full DB context. */
+    fun askAgent() {
+        val q = _query.value.trim()
+        if (q.isBlank()) return
+
+        _agentState.value = AgentState.Loading
+        viewModelScope.launch {
+            val allEntries = db.homeEntryDao().getAllList()
+            val allWorks = db.workDao().getAllList()
+            val answer = withContext(Dispatchers.IO) {
+                try {
+                    AgentRepository.ask(q, allEntries, allWorks)
+                } catch (e: Exception) {
+                    "Error: ${e.message}"
+                }
+            }
+            _agentState.value = AgentState.Answer(answer)
+        }
+    }
+
     fun openSearch() {
         _isSearching.value = true
     }
@@ -66,6 +98,7 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
         _isSearching.value = false
         _query.value = ""
         _results.value = emptyList()
+        _agentState.value = AgentState.Idle
     }
 
     class Factory(private val app: Application) : ViewModelProvider.Factory {
