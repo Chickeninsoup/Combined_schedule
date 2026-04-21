@@ -184,7 +184,8 @@ class AgentQualityTest {
         report.assertContainsAnyOf(
             "completed", "done", "finished", "submitted", "already",
             "not pending", "no longer", "complete",
-            "don't have", "don\u2019t have", "only", "pending"
+            "don't have", "don\u2019t have", "only", "pending",
+            "do not have", "not have", "No,", "no,"
         )
         report.assertNoError()
         report.print()

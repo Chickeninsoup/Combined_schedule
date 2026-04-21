@@ -1,10 +1,15 @@
 package com.example.combined_schedule
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,8 +88,10 @@ import com.example.combined_schedule.ui.screens.CourseDetailScreen
 import com.example.combined_schedule.ui.screens.HomeScreen
 import com.example.combined_schedule.ui.screens.NotificationSettingsScreen
 import com.example.combined_schedule.ui.screens.WeatherScreen
+import com.example.combined_schedule.receiver.HomeReminderReceiver
 import com.example.combined_schedule.ui.theme.Combined_scheduleTheme
 import com.example.combined_schedule.ui.viewmodel.AgentState
+import com.example.combined_schedule.ui.viewmodel.BusScheduleViewModel
 import com.example.combined_schedule.ui.viewmodel.SearchResult
 import com.example.combined_schedule.ui.viewmodel.SearchViewModel
 
@@ -117,6 +124,25 @@ val bottomNavItems = listOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Create notification channels up front so reminders work even before
+        // the user has added any entries (e.g. after a reinstall or first launch).
+        HomeReminderReceiver.ensureChannel(this)
+        BusScheduleViewModel.ensureNotificationChannel(this)
+
+        // On Android 13+ notifications are a runtime permission.
+        // Request it now so class and bus reminders can actually appear.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                0
+            )
+        }
+
         enableEdgeToEdge()
         setContent {
             Combined_scheduleTheme {
