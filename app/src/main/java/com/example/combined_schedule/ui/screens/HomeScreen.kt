@@ -68,6 +68,10 @@ fun HomeScreen(
     val upcomingEntries = todayEntries.filter { !entryTime(it).isBefore(currentTime) }
     val nextEntry = upcomingEntries.firstOrNull()
 
+    var bannerDismissed by remember { mutableStateOf(false) }
+    // Reset dismiss when a new event becomes "next" so the banner reappears
+    LaunchedEffect(nextEntry?.title) { bannerDismissed = false }
+
     // Incomplete Work items due today or overdue, sorted with today's first
     val dueWorks = remember(allWorks, today) {
         allWorks
@@ -103,9 +107,13 @@ fun HomeScreen(
 
             // ── Next Event Banner ─────────────────────────────────────────────
             item {
-                if (nextEntry != null) {
-                    NextEventBanner(entry = nextEntry, currentTime = currentTime)
-                } else {
+                if (nextEntry != null && !bannerDismissed) {
+                    NextEventBanner(
+                        entry = nextEntry,
+                        currentTime = currentTime,
+                        onDismiss = { bannerDismissed = true }
+                    )
+                } else if (nextEntry == null) {
                     NoMoreEventsCard()
                 }
                 Spacer(Modifier.height(20.dp))
@@ -266,28 +274,52 @@ private fun entryTime(entry: HomeEntry): LocalTime {
     return LocalTime.of(h, m)
 }
 
+// ─── Banner logic helpers (internal so unit tests can call them) ──────────────
+
+internal fun bannerIsUrgent(minutesUntil: Long): Boolean = minutesUntil in 0..30
+
+internal fun bannerCountdownText(minutesUntil: Long): String = when {
+    minutesUntil <= 0 -> "Starting now"
+    minutesUntil < 60 -> "in $minutesUntil min"
+    else -> {
+        val h = minutesUntil / 60
+        val m = minutesUntil % 60
+        if (m == 0L) "in ${h}h" else "in ${h}h ${m}m"
+    }
+}
+
 // ─── Next Event Banner ───────────────────────────────────────────────────────
 
 @Composable
-private fun NextEventBanner(entry: HomeEntry, currentTime: LocalTime) {
+private fun NextEventBanner(entry: HomeEntry, currentTime: LocalTime, onDismiss: () -> Unit) {
     val timeFormatter = DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.ENGLISH)
     val entryLocalTime = entryTime(entry)
     val minutesUntil = Duration.between(currentTime, entryLocalTime).toMinutes()
+    val isUrgent = bannerIsUrgent(minutesUntil)
+    val countdownText = bannerCountdownText(minutesUntil)
 
-    val countdownText = when {
-        minutesUntil <= 0 -> "Starting now"
-        minutesUntil < 60 -> "in $minutesUntil min"
-        else -> {
-            val h = minutesUntil / 60
-            val m = minutesUntil % 60
-            if (m == 0L) "in ${h}h" else "in ${h}h ${m}m"
-        }
-    }
+    val containerColor = if (isUrgent)
+        MaterialTheme.colorScheme.errorContainer
+    else
+        MaterialTheme.colorScheme.primaryContainer
+    val onContainerColor = if (isUrgent)
+        MaterialTheme.colorScheme.onErrorContainer
+    else
+        MaterialTheme.colorScheme.onPrimaryContainer
+    val pillColor = if (isUrgent)
+        MaterialTheme.colorScheme.error
+    else
+        MaterialTheme.colorScheme.primary
+    val onPillColor = if (isUrgent)
+        MaterialTheme.colorScheme.onError
+    else
+        MaterialTheme.colorScheme.onPrimary
+    val headerLabel = if (isUrgent) "STARTING SOON" else "UP NEXT"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -297,19 +329,30 @@ private fun NextEventBanner(entry: HomeEntry, currentTime: LocalTime) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "UP NEXT",
+                    text = headerLabel,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.65f)
+                    color = onContainerColor.copy(alpha = 0.65f)
                 )
-                Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primary) {
-                    Text(
-                        text = countdownText,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = RoundedCornerShape(20.dp), color = pillColor) {
+                        Text(
+                            text = countdownText,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = onPillColor,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss",
+                            tint = onContainerColor.copy(alpha = 0.55f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
@@ -323,12 +366,12 @@ private fun NextEventBanner(entry: HomeEntry, currentTime: LocalTime) {
                         text = entry.title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = onContainerColor
                     )
                     Text(
                         text = entryLocalTime.format(timeFormatter),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        color = onContainerColor.copy(alpha = 0.8f)
                     )
                 }
             }
@@ -339,14 +382,14 @@ private fun NextEventBanner(entry: HomeEntry, currentTime: LocalTime) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.65f),
+                        tint = onContainerColor.copy(alpha = 0.65f),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = entry.location,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.65f)
+                        color = onContainerColor.copy(alpha = 0.65f)
                     )
                 }
             }

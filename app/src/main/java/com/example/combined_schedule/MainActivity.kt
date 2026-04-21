@@ -101,7 +101,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Bus : Screen("bus", "Bus", Icons.Default.LocationOn)
     object Weather : Screen("weather", "Weather", Icons.Default.Cloud)
     object AddEdit : Screen("add_edit", "Add/Edit", Icons.Default.Add)
-    object Notifications : Screen("notifications", "Alerts", Icons.Default.Notifications)
+    object Notifications : Screen("notifications", "Reminders", Icons.Default.Notifications)
     object Agent : Screen("agent", "AI", Icons.Default.AutoAwesome)
     object CourseDetail : Screen("course_detail/{entryId}", "", Icons.Default.DateRange) {
         fun routeFor(entryId: String) = "course_detail/$entryId"
