@@ -76,6 +76,7 @@ import androidx.navigation.navArgument
 import com.example.combined_schedule.data.HomeEntry
 import com.example.combined_schedule.data.Work
 import com.example.combined_schedule.ui.screens.AddEditEntryScreen
+import com.example.combined_schedule.ui.screens.AgentScreen
 import com.example.combined_schedule.ui.screens.BusScheduleScreen
 import com.example.combined_schedule.ui.screens.ClassScheduleScreen
 import com.example.combined_schedule.ui.screens.CourseDetailScreen
@@ -94,6 +95,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Weather : Screen("weather", "Weather", Icons.Default.Cloud)
     object AddEdit : Screen("add_edit", "Add/Edit", Icons.Default.Add)
     object Notifications : Screen("notifications", "Alerts", Icons.Default.Notifications)
+    object Agent : Screen("agent", "AI", Icons.Default.AutoAwesome)
     object CourseDetail : Screen("course_detail/{entryId}", "", Icons.Default.DateRange) {
         fun routeFor(entryId: String) = "course_detail/$entryId"
     }
@@ -108,7 +110,8 @@ val bottomNavItems = listOf(
     Screen.Bus,
     Screen.AddEdit,
     Screen.Weather,
-    Screen.Notifications
+    Screen.Notifications,
+    Screen.Agent
 )
 
 class MainActivity : ComponentActivity() {
@@ -239,6 +242,7 @@ fun AppNavigation() {
                 composable(Screen.Weather.route) { WeatherScreen() }
                 composable(Screen.AddEdit.route) { AddEditEntryScreen(onBack = { navController.popBackStack() }) }
                 composable(Screen.Notifications.route) { NotificationSettingsScreen() }
+                composable(Screen.Agent.route) { AgentScreen() }
                 composable(
                     route = Screen.CourseDetail.route,
                     arguments = listOf(navArgument("entryId") { type = NavType.StringType })

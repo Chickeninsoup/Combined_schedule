@@ -76,7 +76,7 @@ class AgentFeatureTest {
     @Test
     fun systemPrompt_noEntries_showsFallback() {
         val prompt = AgentRepository.buildSystemPrompt(emptyList(), emptyList())
-        assertTrue(prompt.contains("No schedule entries."))
+        assertTrue(prompt.contains("No classes are scheduled."))
     }
 
     @Test
@@ -159,18 +159,42 @@ class AgentFeatureTest {
     }
 
     @Test
-    fun systemPrompt_workNoDueDate_noDueLine() {
+    fun systemPrompt_workNoDueDate_showsNoDueDateLabel() {
         val work = Work(courseTitle = "CS 124", title = "MP 2", dueDate = "")
         val prompt = AgentRepository.buildSystemPrompt(emptyList(), listOf(work))
         assertTrue(prompt.contains("MP 2"))
-        assertFalse(prompt.contains("MP 2\" for CS 124 due"))
+        assertTrue(prompt.contains("no due date"))
     }
 
     @Test
     fun systemPrompt_hasScheduleAndAssignmentSections() {
         val prompt = AgentRepository.buildSystemPrompt(emptyList(), emptyList())
-        assertTrue(prompt.contains("SCHEDULE ENTRIES:"))
-        assertTrue(prompt.contains("PENDING ASSIGNMENTS:"))
+        assertTrue(prompt.contains("WEEKLY CLASS SCHEDULE"))
+        assertTrue(prompt.contains("PENDING ASSIGNMENTS"))
+    }
+
+    @Test
+    fun systemPrompt_includesTodayDate() {
+        val prompt = AgentRepository.buildSystemPrompt(emptyList(), emptyList(), today = "Monday, April 21, 2026")
+        assertTrue(prompt.contains("Monday, April 21, 2026"))
+    }
+
+    @Test
+    fun systemPrompt_assignmentsSortedByDueDate() {
+        val works = listOf(
+            Work(courseTitle = "CS 124", title = "MP 5", isCompleted = false, dueDate = "2026-05-01"),
+            Work(courseTitle = "MATH 241", title = "HW 10", isCompleted = false, dueDate = "2026-04-22")
+        )
+        val prompt = AgentRepository.buildSystemPrompt(emptyList(), works)
+        // HW 10 (Apr 22) must appear before MP 5 (May 1) in the prompt
+        assertTrue(prompt.indexOf("HW 10") < prompt.indexOf("MP 5"))
+    }
+
+    @Test
+    fun systemPrompt_entryFormatIncludesDays() {
+        val entry = HomeEntry(title = "CS 101", time = "09:00", daysOfWeek = listOf("Mon", "Wed", "Fri"))
+        val prompt = AgentRepository.buildSystemPrompt(listOf(entry), emptyList())
+        assertTrue(prompt.contains("Mon/Wed/Fri"))
     }
 
     // ── JSON response parsing (Ollama /api/chat format) ──────────────────────
