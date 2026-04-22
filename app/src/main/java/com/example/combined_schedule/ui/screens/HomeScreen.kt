@@ -99,12 +99,7 @@ fun HomeScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
-                val statusLine = when {
-                    allEntries.isEmpty() -> "Add your first class or bus route below"
-                    upcomingEntries.isEmpty() -> "No more events today"
-                    upcomingEntries.size == 1 -> "1 event remaining today"
-                    else -> "${upcomingEntries.size} events remaining today"
-                }
+                val statusLine = homeStatusLine(allEntries.size, upcomingEntries.size)
                 Text(
                     text = statusLine,
                     style = MaterialTheme.typography.bodyLarge,
@@ -316,6 +311,19 @@ private fun entryTime(entry: HomeEntry): LocalTime {
     return LocalTime.of(h, m)
 }
 
+// ─── Home screen logic helpers (internal so unit tests can call them) ────────
+
+internal fun homeStatusLine(totalEntries: Int, upcomingCount: Int): String = when {
+    totalEntries == 0  -> "Add your first class or bus route below"
+    upcomingCount == 0 -> "No more events today"
+    upcomingCount == 1 -> "1 event remaining today"
+    else               -> "$upcomingCount events remaining today"
+}
+
+internal fun noEventsCardText(isEmpty: Boolean): String =
+    if (isEmpty) "Tap + to add your first class or bus route"
+    else "No more events today 🎉"
+
 // ─── Banner logic helpers (internal so unit tests can call them) ──────────────
 
 internal fun bannerIsUrgent(minutesUntil: Long): Boolean = minutesUntil in 0..30
@@ -453,7 +461,7 @@ private fun NoMoreEventsCard(isEmpty: Boolean = false) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (isEmpty) "Tap + to add your first class or bus route" else "No more events today 🎉",
+                text = noEventsCardText(isEmpty),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
