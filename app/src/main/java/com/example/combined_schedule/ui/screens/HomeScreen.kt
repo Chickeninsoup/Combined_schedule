@@ -72,10 +72,17 @@ fun HomeScreen(
     // Reset dismiss when a new event becomes "next" so the banner reappears
     LaunchedEffect(nextEntry?.title) { bannerDismissed = false }
 
-    // Incomplete Work items due today or overdue, sorted with today's first
+    // Incomplete Work items due today or overdue, sorted with oldest first
     val dueWorks = remember(allWorks, today) {
         allWorks
             .filter { !it.isCompleted && DateUtils.isDueOrOverdue(it.dueDate, today) }
+            .sortedBy { it.dueDate }
+    }
+
+    // Incomplete Work items due in the next 7 days (strictly after today)
+    val upcomingWorks = remember(allWorks, today) {
+        allWorks
+            .filter { !it.isCompleted && DateUtils.isDueWithinDays(it.dueDate, today, 7) }
             .sortedBy { it.dueDate }
     }
 
@@ -193,6 +200,27 @@ fun HomeScreen(
                     Spacer(Modifier.height(8.dp))
                 }
                 items(dueWorks, key = { "due_${it.id}" }) { work ->
+                    DueWorkItem(
+                        work = work,
+                        today = today,
+                        onMarkDone = { workRepo.update(work.copy(isCompleted = true)) }
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+
+            // ── Upcoming assignments (due in next 7 days) ─────────────────────
+            if (upcomingWorks.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Upcoming Assignments",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(upcomingWorks, key = { "upcoming_${it.id}" }) { work ->
                     DueWorkItem(
                         work = work,
                         today = today,

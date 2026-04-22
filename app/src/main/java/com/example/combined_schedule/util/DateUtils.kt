@@ -31,4 +31,14 @@ object DateUtils {
         val d = parseIsoDate(isoDate) ?: return false
         return !d.isAfter(today)
     }
+
+    /**
+     * Returns true when [isoDate] falls strictly after [today] and within [days] days from today.
+     * Used to show the "Upcoming" assignments section on the Home Screen.
+     */
+    fun isDueWithinDays(isoDate: String, today: LocalDate, days: Int): Boolean {
+        if (isoDate.isBlank()) return false
+        val d = parseIsoDate(isoDate) ?: return false
+        return d.isAfter(today) && !d.isAfter(today.plusDays(days.toLong()))
+    }
 }
