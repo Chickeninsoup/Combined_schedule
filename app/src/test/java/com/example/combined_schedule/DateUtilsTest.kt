@@ -116,4 +116,65 @@ class DateUtilsTest {
         // Old-format dates that can't be parsed should not appear in the section
         assertFalse(DateUtils.isDueOrOverdue("Apr 5", LocalDate.of(2026, 4, 13)))
     }
+
+    // ── isDueWithinDays ───────────────────────────────────────────────────────
+
+    private val today = LocalDate.of(2026, 4, 22)
+
+    @Test
+    fun isDueWithinDays_tomorrow_returnsTrue() {
+        assertTrue(DateUtils.isDueWithinDays("2026-04-23", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_day7_included() {
+        // Exactly 7 days from today (Apr 22 + 7 = Apr 29) should be included
+        assertTrue(DateUtils.isDueWithinDays("2026-04-29", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_day8_excluded() {
+        // One day beyond the window should not appear
+        assertFalse(DateUtils.isDueWithinDays("2026-04-30", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_today_returnsFalse() {
+        // Today belongs to the "Due Today" section, not "Upcoming"
+        assertFalse(DateUtils.isDueWithinDays("2026-04-22", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_yesterday_returnsFalse() {
+        // Overdue belongs to the "Due Today" section, not "Upcoming"
+        assertFalse(DateUtils.isDueWithinDays("2026-04-21", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_farFuture_returnsFalse() {
+        assertFalse(DateUtils.isDueWithinDays("2026-12-31", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_blankDate_returnsFalse() {
+        assertFalse(DateUtils.isDueWithinDays("", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_unparseableDate_returnsFalse() {
+        assertFalse(DateUtils.isDueWithinDays("Apr 25", today, 7))
+    }
+
+    @Test
+    fun isDueWithinDays_windowOf1_onlyTomorrowIncluded() {
+        assertTrue(DateUtils.isDueWithinDays("2026-04-23", today, 1))
+        assertFalse(DateUtils.isDueWithinDays("2026-04-24", today, 1))
+    }
+
+    @Test
+    fun isDueWithinDays_windowOf0_nothingIncluded() {
+        // A window of 0 days after today means no dates qualify
+        assertFalse(DateUtils.isDueWithinDays("2026-04-22", today, 0))
+        assertFalse(DateUtils.isDueWithinDays("2026-04-23", today, 0))
+    }
 }

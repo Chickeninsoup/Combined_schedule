@@ -99,9 +99,10 @@ fun HomeScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
-                val statusLine = when (upcomingEntries.size) {
-                    0 -> "No more events today"
-                    1 -> "1 event remaining today"
+                val statusLine = when {
+                    allEntries.isEmpty() -> "Add your first class or bus route below"
+                    upcomingEntries.isEmpty() -> "No more events today"
+                    upcomingEntries.size == 1 -> "1 event remaining today"
                     else -> "${upcomingEntries.size} events remaining today"
                 }
                 Text(
@@ -121,7 +122,7 @@ fun HomeScreen(
                         onDismiss = { bannerDismissed = true }
                     )
                 } else if (nextEntry == null) {
-                    NoMoreEventsCard()
+                    NoMoreEventsCard(isEmpty = allEntries.isEmpty())
                 }
                 Spacer(Modifier.height(20.dp))
             }
@@ -441,7 +442,7 @@ private fun NextEventBanner(entry: HomeEntry, currentTime: LocalTime, onDismiss:
 // ─── No More Events ──────────────────────────────────────────────────────────
 
 @Composable
-private fun NoMoreEventsCard() {
+private fun NoMoreEventsCard(isEmpty: Boolean = false) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -452,7 +453,7 @@ private fun NoMoreEventsCard() {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "No more events today 🎉",
+                text = if (isEmpty) "Tap + to add your first class or bus route" else "No more events today 🎉",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
