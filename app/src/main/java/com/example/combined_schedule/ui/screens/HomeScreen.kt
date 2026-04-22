@@ -193,7 +193,11 @@ fun HomeScreen(
                     Spacer(Modifier.height(8.dp))
                 }
                 items(dueWorks, key = { "due_${it.id}" }) { work ->
-                    DueWorkItem(work = work, today = today)
+                    DueWorkItem(
+                        work = work,
+                        today = today,
+                        onMarkDone = { workRepo.update(work.copy(isCompleted = true)) }
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -214,7 +218,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun DueWorkItem(work: Work, today: LocalDate) {
+private fun DueWorkItem(work: Work, today: LocalDate, onMarkDone: () -> Unit) {
     val workDate = DateUtils.parseIsoDate(work.dueDate)
     val isOverdue = workDate != null && workDate.isBefore(today)
 
@@ -262,6 +266,15 @@ private fun DueWorkItem(work: Work, today: LocalDate) {
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
+                Spacer(Modifier.width(8.dp))
+            }
+            IconButton(onClick = onMarkDone, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Mark done",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }
