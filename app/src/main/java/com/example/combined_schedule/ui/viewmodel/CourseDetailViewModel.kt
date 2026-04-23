@@ -22,6 +22,11 @@ class CourseDetailViewModel(
         repo.insert(Work(courseTitle = courseTitle, title = title, description = description, dueDate = dueDate))
     }
 
+    fun updateWork(work: Work, title: String, description: String, dueDate: String) {
+        if (title.isBlank()) return
+        repo.update(work.copy(title = title, description = description, dueDate = dueDate))
+    }
+
     fun toggleComplete(work: Work) {
         repo.update(work.copy(isCompleted = !work.isCompleted))
     }

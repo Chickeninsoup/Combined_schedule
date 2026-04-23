@@ -42,6 +42,7 @@ fun CourseDetailScreen(
 
     val works by vm.works.collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingWork by remember { mutableStateOf<Work?>(null) }
 
     Scaffold(
         topBar = {
@@ -107,6 +108,7 @@ fun CourseDetailScreen(
                     WorkItem(
                         work = work,
                         onToggle = { vm.toggleComplete(work) },
+                        onEdit = { editingWork = work },
                         onDelete = { vm.deleteWork(work) }
                     )
                 }
@@ -117,11 +119,23 @@ fun CourseDetailScreen(
     }
 
     if (showAddDialog) {
-        AddWorkDialog(
+        WorkDialog(
+            initial = null,
             onDismiss = { showAddDialog = false },
             onConfirm = { title, description, dueDate ->
                 vm.addWork(title, description, dueDate)
                 showAddDialog = false
+            }
+        )
+    }
+
+    editingWork?.let { work ->
+        WorkDialog(
+            initial = work,
+            onDismiss = { editingWork = null },
+            onConfirm = { title, description, dueDate ->
+                vm.updateWork(work, title, description, dueDate)
+                editingWork = null
             }
         )
     }
@@ -176,7 +190,7 @@ private fun CourseInfoCard(entry: HomeEntry) {
 }
 
 @Composable
-private fun WorkItem(work: Work, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun WorkItem(work: Work, onToggle: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -228,6 +242,10 @@ private fun WorkItem(work: Work, onToggle: () -> Unit, onDelete: () -> Unit) {
                     }
                 }
             }
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
@@ -238,13 +256,15 @@ private fun WorkItem(work: Work, onToggle: () -> Unit, onDelete: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddWorkDialog(
+private fun WorkDialog(
+    initial: Work?,
     onDismiss: () -> Unit,
     onConfirm: (title: String, description: String, dueDate: String) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var dueDate by remember { mutableStateOf("") }
+    val isEdit = initial != null
+    var title by remember { mutableStateOf(initial?.title ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var dueDate by remember { mutableStateOf(initial?.dueDate ?: "") }
     var showDatePicker by remember { mutableStateOf(false) }
 
     if (showDatePicker) {
@@ -271,7 +291,7 @@ private fun AddWorkDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Assignment") },
+        title = { Text(if (isEdit) "Edit Assignment" else "Add Assignment") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
@@ -305,7 +325,7 @@ private fun AddWorkDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(title, description, dueDate) }, enabled = title.isNotBlank()) {
-                Text("Add")
+                Text(if (isEdit) "Save" else "Add")
             }
         },
         dismissButton = {
