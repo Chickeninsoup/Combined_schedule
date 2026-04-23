@@ -184,7 +184,7 @@ fun AppNavigation() {
                             )
                         } else {
                             Text(
-                                "CombinedSchedule",
+                                "My Schedule",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
