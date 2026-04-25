@@ -25,7 +25,10 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +65,7 @@ fun AgentScreen() {
     val isLoading by vm.isLoading.collectAsStateWithLifecycle()
 
     var input by remember { mutableStateOf("") }
+    var showClearDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     // Scroll to bottom when a new message arrives
@@ -69,6 +73,23 @@ fun AgentScreen() {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
+    }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text("Clear conversation?") },
+            text = { Text("This will delete all messages in this chat. This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { vm.clearHistory(); showClearDialog = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Clear") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -87,7 +108,7 @@ fun AgentScreen() {
             },
             actions = {
                 if (messages.isNotEmpty()) {
-                    IconButton(onClick = vm::clearHistory) {
+                    IconButton(onClick = { showClearDialog = true }) {
                         Icon(Icons.Default.Delete, contentDescription = "Clear chat")
                     }
                 }
@@ -220,7 +241,7 @@ private fun TypingIndicator() {
     }
 }
 
-private val suggestions = listOf(
+internal val suggestions = listOf(
     "What classes do I have today?",
     "What's due this week?",
     "When is my next class?",

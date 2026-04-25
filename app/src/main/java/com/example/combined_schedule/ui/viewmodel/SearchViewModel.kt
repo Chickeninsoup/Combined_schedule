@@ -101,6 +101,19 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
         _agentState.value = AgentState.Idle
     }
 
+    companion object {
+        /** Pure filter used by tests. Mirrors the DAO LIKE query logic. */
+        internal fun filterEntries(query: String, entries: List<HomeEntry>): List<SearchResult.EntryResult> =
+            entries.filter { it.title.contains(query, ignoreCase = true) }
+                .map { SearchResult.EntryResult(it) }
+
+        internal fun filterWorks(query: String, works: List<Work>): List<SearchResult.WorkResult> =
+            works.filter {
+                it.title.contains(query, ignoreCase = true) ||
+                    it.courseTitle.contains(query, ignoreCase = true)
+            }.map { SearchResult.WorkResult(it) }
+    }
+
     class Factory(private val app: Application) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =

@@ -64,21 +64,10 @@ fun AddEditEntryScreen(
     val allDays = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
     val reminderOptions = listOf(5, 10, 15, 30)
 
-    fun formatDisplayTime(hour: Int, minute: Int): String {
-        val period = if (hour < 12) "AM" else "PM"
-        val displayHour = when {
-            hour == 0 -> 12
-            hour > 12 -> hour - 12
-            else -> hour
-        }
-        return "%d:%02d %s".format(displayHour, minute, period)
-    }
-
     fun validate(): Boolean {
-        titleError = title.isBlank()
-        daysError = daysOfWeek.isEmpty()
-        timeError = !timeSet
-        return !titleError && !daysError && !timeError
+        val (te, de, toe) = validateEntry(title, daysOfWeek, timeSet)
+        titleError = te; daysError = de; timeError = toe
+        return !te && !de && !toe
     }
 
     fun save() {
@@ -323,6 +312,22 @@ fun AddEditEntryScreen(
         }
     }
 }
+
+// ── Extracted helpers (internal so unit tests can call them) ─────────────────
+
+internal fun formatDisplayTime(hour: Int, minute: Int): String {
+    val period = if (hour < 12) "AM" else "PM"
+    val displayHour = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return "%d:%02d %s".format(displayHour, minute, period)
+}
+
+/** Returns (titleError, daysError, timeError). All three must be false for the form to be valid. */
+internal fun validateEntry(title: String, daysOfWeek: Set<String>, timeSet: Boolean): Triple<Boolean, Boolean, Boolean> =
+    Triple(title.isBlank(), daysOfWeek.isEmpty(), !timeSet)
 
 @Composable
 private fun EntrySection(label: String, content: @Composable ColumnScope.() -> Unit) {
