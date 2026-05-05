@@ -33,10 +33,6 @@
         </activity>
 
         <receiver
-            android:name=".receiver.BusReminderReceiver"
-            android:exported="false" />
-
-        <receiver
             android:name=".receiver.HomeReminderReceiver"
             android:exported="false" />
 

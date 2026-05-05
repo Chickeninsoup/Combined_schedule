@@ -1,6 +1,8 @@
 package com.example.combined_schedule.data
 
 import android.content.Context
+import com.example.combined_schedule.receiver.HomeReminderReceiver
+import com.example.combined_schedule.util.NotificationScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -10,7 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-class HomeEntryRepository(context: Context) {
+class HomeEntryRepository(private val context: Context) {
 
     private val dao = AppDatabase.getInstance(context).homeEntryDao()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -48,6 +50,9 @@ class HomeEntryRepository(context: Context) {
                 daysOfWeek = listOf("Tue", "Thu"), isBus = false)
         )
         defaults.forEach { dao.insert(it) }
+        // Schedule reminders for seeded entries so notifications work on first install.
+        HomeReminderReceiver.ensureChannel(context)
+        defaults.filter { it.reminderEnabled }.forEach { NotificationScheduler.schedule(context, it) }
     }
 
     companion object {

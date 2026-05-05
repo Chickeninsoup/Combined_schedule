@@ -76,10 +76,28 @@ object NotificationScheduler {
         }
     }
 
-    /** Reschedule one specific day-of-week for exactly one week from now (called by the receiver). */
+    /**
+     * Reschedule one specific day-of-week alarm for next week (called by the receiver after firing).
+     * Computes the exact scheduled trigger time rather than adding milliseconds from now,
+     * so the alarm never drifts even if it fires slightly late.
+     */
     fun rescheduleNextWeek(context: Context, entry: HomeEntry, dayStr: String) {
         if (!entry.reminderEnabled) return
-        val triggerMs = System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000L
+        val dow = dayMap[dayStr] ?: return
+        val parts = entry.time.split(":")
+        val hour = parts.getOrNull(0)?.toIntOrNull() ?: return
+        val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        val triggerTime = LocalTime.of(hour, minute).minusMinutes(entry.reminderMinutes.toLong())
+
+        // The alarm just fired today on dayStr — next occurrence is 7 days from today.
+        val targetDate = LocalDate.now().plusDays(7).let { base ->
+            var d = base
+            while (d.dayOfWeek != dow) d = d.plusDays(1)
+            d
+        }
+        val triggerMs = LocalDateTime.of(targetDate, triggerTime)
+            .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
         val pi = buildPendingIntent(context, entry, dayStr)
         val am = context.getSystemService(AlarmManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
