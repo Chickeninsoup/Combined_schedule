@@ -6,9 +6,10 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.core.app.ActivityCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -133,19 +134,6 @@ class MainActivity : ComponentActivity() {
         HomeReminderReceiver.ensureChannel(this)
         BusScheduleViewModel.ensureNotificationChannel(this)
 
-        // On Android 13+ notifications are a runtime permission.
-        // Request it now so class and bus reminders can actually appear.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                0
-            )
-        }
-
         enableEdgeToEdge()
         setContent {
             Combined_scheduleTheme {
@@ -166,6 +154,21 @@ fun AppNavigation() {
         || currentDestination?.route == Screen.About.route
 
     val context = LocalContext.current
+
+    // On Android 13+ POST_NOTIFICATIONS is a runtime permission. Request it
+    // after the UI is ready so the dialog doesn't fire before anything renders.
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* granted/denied; NotificationSettingsScreen shows a banner if denied */ }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     val searchVm: SearchViewModel = viewModel(
         factory = SearchViewModel.Factory(context.applicationContext as android.app.Application)
     )
