@@ -18,6 +18,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.combined_schedule.data.HomeEntry
 import com.example.combined_schedule.data.NotificationSettingsRepository
 import com.example.combined_schedule.ui.viewmodel.HomeEntryViewModel
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +50,8 @@ fun AddEditEntryScreen(
     var timeMinute by remember(existing) { mutableStateOf(existing?.time?.substringAfter(":")?.toIntOrNull() ?: 0) }
     var timeSet by remember(existing) { mutableStateOf(existing != null) }
     var timeError by remember { mutableStateOf(false) }
-    var daysOfWeek by remember(existing) { mutableStateOf(existing?.daysOfWeek?.toSet() ?: setOf("Mon", "Tue", "Wed", "Thu", "Fri")) }
+    val todayDayStr = LocalDate.now().dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+    var daysOfWeek by remember(existing) { mutableStateOf(existing?.daysOfWeek?.toSet() ?: setOf(todayDayStr)) }
     var daysError by remember { mutableStateOf(false) }
     var reminderEnabled by remember(existing) { mutableStateOf(existing?.reminderEnabled ?: false) }
     var reminderMinutes by remember(existing) { mutableStateOf(existing?.reminderMinutes ?: defaultReminderMinutes) }
