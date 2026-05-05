@@ -6,6 +6,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * Unit tests for the AddEditEntryScreen's extracted validation and time-formatting helpers.
@@ -102,5 +105,31 @@ class AddEditEntryValidationTest {
     @Test
     fun formatDisplayTime_1am_shows1AM() {
         assertEquals("1:15 AM", formatDisplayTime(1, 15))
+    }
+
+    // ── Today's day pre-selection ─────────────────────────────────────────────
+
+    private val allDays = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+    @Test
+    fun todayDayStr_formatMatchesFormDayList() {
+        // Verify that TextStyle.SHORT in English produces values that exist in the
+        // form's allDays list so the pre-selection always hits a valid chip.
+        DayOfWeek.values().forEach { dow ->
+            val name = dow.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+            assertTrue(
+                "Day name '$name' not found in allDays list",
+                allDays.contains(name)
+            )
+        }
+    }
+
+    @Test
+    fun todayDayStr_allSevenDaysCovered() {
+        val names = DayOfWeek.values()
+            .map { it.getDisplayName(TextStyle.SHORT, Locale.ENGLISH) }
+            .toSet()
+        assertEquals(7, names.size)
+        assertEquals(allDays.toSet(), names)
     }
 }
