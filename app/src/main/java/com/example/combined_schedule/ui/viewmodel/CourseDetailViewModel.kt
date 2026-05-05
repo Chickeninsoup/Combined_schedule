@@ -14,7 +14,14 @@ class CourseDetailViewModel(
 
     val works = repo.getAll().map { list ->
         list.filter { it.courseTitle == courseTitle }
-            .sortedWith(compareBy({ it.isCompleted }, { it.dueDate }))
+            .sortedWith(
+                // Incomplete before complete; within each group, dated items first sorted
+                // by date, then undated items last.
+                compareBy(
+                    { it.isCompleted },
+                    { if (it.dueDate.isBlank()) "9999-99-99" else it.dueDate }
+                )
+            )
     }
 
     fun addWork(title: String, description: String, dueDate: String) {

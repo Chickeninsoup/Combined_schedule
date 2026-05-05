@@ -191,6 +191,10 @@ private fun CourseInfoCard(entry: HomeEntry) {
 
 @Composable
 private fun WorkItem(work: Work, onToggle: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val today = LocalDate.now()
+    val workDate = DateUtils.parseIsoDate(work.dueDate)
+    val isOverdue = !work.isCompleted && workDate != null && workDate.isBefore(today)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -228,16 +232,20 @@ private fun WorkItem(work: Work, onToggle: () -> Unit, onEdit: () -> Unit, onDel
                     )
                 }
                 if (work.dueDate.isNotBlank()) {
+                    val dueTint = if (isOverdue) MaterialTheme.colorScheme.error
+                                  else MaterialTheme.colorScheme.primary
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.primary)
+                            tint = dueTint)
                         Text(
-                            text = "Due: ${formatWorkDate(work.dueDate)}",
+                            text = if (isOverdue) "Overdue · ${formatWorkDate(work.dueDate)}"
+                                   else "Due: ${formatWorkDate(work.dueDate)}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = dueTint,
+                            fontWeight = if (isOverdue) FontWeight.SemiBold else FontWeight.Normal
                         )
                     }
                 }
