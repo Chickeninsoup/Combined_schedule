@@ -26,12 +26,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
@@ -80,6 +81,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.combined_schedule.data.HomeEntry
 import com.example.combined_schedule.data.Work
+import com.example.combined_schedule.ui.screens.AboutScreen
 import com.example.combined_schedule.ui.screens.AddEditEntryScreen
 import com.example.combined_schedule.ui.screens.AgentScreen
 import com.example.combined_schedule.ui.screens.BusScheduleScreen
@@ -109,6 +111,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object EditEntry : Screen("edit_entry/{entryId}", "", Icons.Default.Add) {
         fun routeFor(entryId: String) = "edit_entry/$entryId"
     }
+    object About : Screen("about", "About", Icons.Default.Info)
 }
 
 val bottomNavItems = listOf(
@@ -160,6 +163,7 @@ fun AppNavigation() {
     val currentDestination = navBackStackEntry?.destination
     val isDetailScreen = currentDestination?.route?.startsWith("course_detail") == true
         || currentDestination?.route?.startsWith("edit_entry") == true
+        || currentDestination?.route == Screen.About.route
 
     val context = LocalContext.current
     val searchVm: SearchViewModel = viewModel(
@@ -193,7 +197,7 @@ fun AppNavigation() {
                     navigationIcon = {
                         if (isSearching) {
                             IconButton(onClick = searchVm::closeSearch) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "Close search")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close search")
                             }
                         }
                     },
@@ -207,6 +211,13 @@ fun AppNavigation() {
                         } else {
                             IconButton(onClick = searchVm::openSearch) {
                                 Icon(Icons.Default.Search, contentDescription = "Search")
+                            }
+                            IconButton(onClick = {
+                                navController.navigate(Screen.About.route) {
+                                    launchSingleTop = true
+                                }
+                            }) {
+                                Icon(Icons.Default.Info, contentDescription = "About")
                             }
                         }
                     },
@@ -263,12 +274,27 @@ fun AppNavigation() {
                         }
                     )
                 }
-                composable(Screen.Classes.route) { ClassScheduleScreen() }
+                composable(Screen.Classes.route) {
+                    ClassScheduleScreen(
+                        onNavigateToAddEdit = {
+                            navController.navigate(Screen.AddEdit.route) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onCourseClick = { entry ->
+                            navController.navigate(Screen.CourseDetail.routeFor(entry.id))
+                        },
+                        onEditEntry = { entryId ->
+                            navController.navigate(Screen.EditEntry.routeFor(entryId))
+                        }
+                    )
+                }
                 composable(Screen.Bus.route) { BusScheduleScreen() }
                 composable(Screen.Weather.route) { WeatherScreen() }
                 composable(Screen.AddEdit.route) { AddEditEntryScreen(onBack = { navController.popBackStack() }) }
                 composable(Screen.Notifications.route) { NotificationSettingsScreen() }
                 composable(Screen.Agent.route) { AgentScreen() }
+                composable(Screen.About.route) { AboutScreen(onBack = { navController.popBackStack() }) }
                 composable(
                     route = Screen.CourseDetail.route,
                     arguments = listOf(navArgument("entryId") { type = NavType.StringType })
