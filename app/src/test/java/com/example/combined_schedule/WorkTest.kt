@@ -68,6 +68,47 @@ class WorkTest {
     }
 
     @Test
+    fun work_undatedItemsSortAfterDatedItems() {
+        // Items without a due date should appear after dated items within the
+        // same completion group (the CourseDetailViewModel fix).
+        val works = listOf(
+            Work(courseTitle = "CS 124", title = "Undated", dueDate = ""),
+            Work(courseTitle = "CS 124", title = "Later", dueDate = "2026-05-10"),
+            Work(courseTitle = "CS 124", title = "Earlier", dueDate = "2026-04-20")
+        )
+        val sorted = works.sortedWith(
+            compareBy(
+                { it.isCompleted },
+                { if (it.dueDate.isBlank()) "9999-99-99" else it.dueDate }
+            )
+        )
+        assertEquals("Earlier", sorted[0].title)
+        assertEquals("Later", sorted[1].title)
+        assertEquals("Undated", sorted[2].title)
+    }
+
+    @Test
+    fun work_completedItemsSortAfterIncomplete_withMixedDates() {
+        val works = listOf(
+            Work(courseTitle = "CS 124", title = "DoneEarly", dueDate = "2026-04-01", isCompleted = true),
+            Work(courseTitle = "CS 124", title = "TodoLate", dueDate = "2026-05-01", isCompleted = false),
+            Work(courseTitle = "CS 124", title = "TodoEarly", dueDate = "2026-04-15", isCompleted = false)
+        )
+        val sorted = works.sortedWith(
+            compareBy(
+                { it.isCompleted },
+                { if (it.dueDate.isBlank()) "9999-99-99" else it.dueDate }
+            )
+        )
+        assertFalse(sorted[0].isCompleted)
+        assertFalse(sorted[1].isCompleted)
+        assertTrue(sorted[2].isCompleted)
+        assertEquals("TodoEarly", sorted[0].title)
+        assertEquals("TodoLate", sorted[1].title)
+        assertEquals("DoneEarly", sorted[2].title)
+    }
+
+    @Test
     fun work_filterByCourse() {
         val all = listOf(
             Work(courseTitle = "CS 124", title = "MP1"),

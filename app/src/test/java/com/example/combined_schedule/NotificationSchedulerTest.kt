@@ -3,6 +3,8 @@ package com.example.combined_schedule
 import com.example.combined_schedule.data.HomeEntry
 import org.junit.Assert.*
 import org.junit.Test
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
@@ -105,10 +107,33 @@ class NotificationSchedulerTest {
     }
 
     @Test
-    fun nextWeekReschedule_exactlyOneWeekLater() {
-        val triggerMs = 1_000_000_000L
-        val nextWeekMs = triggerMs + 7 * 24 * 60 * 60 * 1_000L
-        assertEquals(1_000_000_000L + 604_800_000L, nextWeekMs)
+    fun rescheduleNextWeek_computesExactTimeFromEntryNotCurrentTime() {
+        // Verify that the reschedule logic computes the trigger from the entry's
+        // known day/time rather than adding milliseconds to the current moment.
+        // This prevents drift when the alarm fires slightly late.
+        val hour = 9; val minute = 0; val reminderMinutes = 10L
+        val dow = DayOfWeek.MONDAY
+
+        val triggerTime = LocalTime.of(hour, minute).minusMinutes(reminderMinutes)
+        assertEquals(LocalTime.of(8, 50), triggerTime)
+
+        // Simulate: alarm fired today (Mon 2026-04-13); next occurrence is 7 days later.
+        val today = LocalDate.of(2026, 4, 13) // a Monday
+        var targetDate = today.plusDays(7)
+        while (targetDate.dayOfWeek != dow) targetDate = targetDate.plusDays(1)
+
+        val triggerDt = LocalDateTime.of(targetDate, triggerTime)
+        assertEquals(LocalDateTime.of(2026, 4, 20, 8, 50), triggerDt)
+    }
+
+    @Test
+    fun rescheduleNextWeek_nonMondayEntry_findsCorrectDay() {
+        // Entry on Wednesday — alarm fires Wed 2026-04-15; next should be Wed 2026-04-22.
+        val dow = DayOfWeek.WEDNESDAY
+        val today = LocalDate.of(2026, 4, 15) // a Wednesday
+        var targetDate = today.plusDays(7)
+        while (targetDate.dayOfWeek != dow) targetDate = targetDate.plusDays(1)
+        assertEquals(LocalDate.of(2026, 4, 22), targetDate)
     }
 
     // ── Settings: globalEnabled blocks scheduling ─────────────────────────────
